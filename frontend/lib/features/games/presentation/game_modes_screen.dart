@@ -11,9 +11,24 @@ class GameModesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final modes = [
-      _GameMode('501', 'Start at 501, race to zero. Checkout with a double!', Icons.filter_1, AppColors.primary, '501'),
-      _GameMode('Cricket', 'Close numbers 15-20 and Bull. Strategy meets skill.', Icons.grid_on, AppColors.secondary, 'CRICKET'),
-      _GameMode('Around the Clock', 'Hit 1-20 in sequence, then bull to win!', Icons.access_time, AppColors.accent, 'ATC'),
+      _GameMode('501', 'Start at 501 and race to exactly zero. Must finish with a double!', Icons.filter_1, AppColors.primary, '501'),
+      _GameMode('301', 'Fast-paced version of 501 with lower starting score.', Icons.filter_2, AppColors.primary, '301'),
+      _GameMode('401', 'Mid-range game. Balance speed with accuracy.', Icons.filter_3, AppColors.primary, '401'),
+      _GameMode('701', 'Extended endurance test. Build consistency over longer play.', Icons.filter_4, AppColors.primary, '701'),
+      _GameMode('1001', 'Ultimate marathon game. Ultimate stamina challenge!', Icons.numbers, AppColors.primary, '1001'),
+      _GameMode('Cricket', 'Close numbers 15-20 and Bull first. Strategy meets skill.', Icons.grid_on, AppColors.secondary, 'CRICKET'),
+      _GameMode('Cricket Cut-Throat', 'Score against opponents. One wrong move helps them!', Icons.whatshot, AppColors.accent, 'CRICKET_CUTTHROAT'),
+      _GameMode('English Cricket', 'Pure closing race. No scoring after closing numbers.', Icons.sports_cricket, AppColors.secondary, 'ENGLISH_CRICKET'),
+      _GameMode('Around the Clock', 'Hit 1-20 in sequence, then bull. Perfect for warm-ups!', Icons.access_time, AppColors.accent, 'ATC'),
+      _GameMode('Shanghai', 'Score-based. Hit single, double, AND treble in one turn to win instantly!', Icons.location_city, AppColors.warning, 'SHANGHAI'),
+      _GameMode('Killer', 'Elimination game. Become killer and take out opponents.', Icons.dangerous, AppColors.error, 'KILLER'),
+      _GameMode('Halve-It', 'High-stakes scoring. Miss your target and your score gets halved!', Icons.trending_down, AppColors.warning, 'HALVE_IT'),
+      _GameMode('Bob\'s 27', 'Start at 27, work through doubles. Add or subtract on hit/miss.', Icons.exposure, AppColors.primary, 'BOBS_27'),
+      _GameMode('Scram', 'Two-player game. One opens numbers, one scores. Then switch!', Icons.swap_horiz, AppColors.secondary, 'SCRAM'),
+      _GameMode('Tic-Tac-Toe', 'Get three in a row on the dartboard. Classic strategy game!', Icons.tag, AppColors.accent, 'TIC_TAC_TOE'),
+      _GameMode('All-Fives', 'Mental math game. Score only when divisible by 5.', Icons.filter_5, AppColors.warning, 'ALL_FIVES'),
+      _GameMode('Mickey Mouse', '10-round game targeting specific numbers. Consistency wins.', Icons.mouse, AppColors.accent, 'MICKEY_MOUSE'),
+      _GameMode('Gotcha', 'Land exactly on opponent\'s score to send them back. Chaos ensues!', Icons.gps_fixed, AppColors.error, 'GOTCHA'),
     ];
 
     return Scaffold(

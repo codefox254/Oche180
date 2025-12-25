@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 
 class UserStatistics(models.Model):
@@ -38,3 +39,30 @@ class PersonalBest(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.metric_name}: {self.value}"
+
+
+class AppUsageEvent(models.Model):
+    class EventType(models.TextChoices):
+        INSTALL = "INSTALL", "Install"
+        SESSION_START = "SESSION_START", "Session Start"
+        SESSION_END = "SESSION_END", "Session End"
+        SCREEN_VIEW = "SCREEN_VIEW", "Screen View"
+        ACTION = "ACTION", "Action"
+
+    user = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="usage_events")
+    event_type = models.CharField(max_length=30, choices=EventType.choices)
+    platform = models.CharField(max_length=30, blank=True)
+    app_version = models.CharField(max_length=30, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField(default=timezone.now, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-occurred_at", "-id"]
+        indexes = [
+            models.Index(fields=["event_type", "-occurred_at"]),
+            models.Index(fields=["platform", "-occurred_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_event_type_display()} @ {self.occurred_at:%Y-%m-%d %H:%M:%S}"

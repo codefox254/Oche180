@@ -27,13 +27,16 @@ class TrainingSessionSerializer(serializers.ModelSerializer):
             "mode",
             "status",
             "settings",
+            "duration_minutes",
+            "elapsed_seconds",
             "final_score",
             "success_rate",
+            "xp_earned",
             "created_at",
             "completed_at",
             "throws",
         ]
-        read_only_fields = ["id", "user", "created_at", "completed_at"]
+        read_only_fields = ["id", "user", "created_at", "completed_at", "xp_earned"]
 
 
 class TrainingPersonalBestSerializer(serializers.ModelSerializer):

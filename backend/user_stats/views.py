@@ -1,16 +1,38 @@
+from datetime import timedelta
+
 from django.db.models import F, Sum, Count, Max
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.models import User
 from games.models import Game, GamePlayer, GameStatistics
-from .models import UserStatistics, PersonalBest
-from .serializers import UserStatisticsSerializer, PersonalBestSerializer
+from training.models import TrainingSession
+from .models import UserStatistics, PersonalBest, AppUsageEvent
+from .serializers import UserStatisticsSerializer, PersonalBestSerializer, AppUsageEventSerializer
+
+
+class IsAuthenticatedOrReadOnly(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return request.user and request.user.is_authenticated
+
+
+class AppUsageEventView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = AppUsageEventSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        event = serializer.save()
+        return Response({"id": event.id}, status=status.HTTP_201_CREATED)
 
 
 class StatsSummaryView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get(self, request):
         user = request.user
@@ -83,9 +105,101 @@ class StatsSummaryView(APIView):
 
 
 class PersonalBestListView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get(self, request):
         qs = PersonalBest.objects.filter(user=request.user).order_by("-achieved_at")
         data = PersonalBestSerializer(qs, many=True).data
         return Response(data)
+
+
+class AdminMetricsView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        now = timezone.now()
+        day_ago = now - timedelta(days=1)
+        week_ago = now - timedelta(days=7)
+
+        def active_user_count(since):
+            active_ids = set(
+                AppUsageEvent.objects.filter(user__isnull=False, occurred_at__gte=since)
+                .values_list("user_id", flat=True)
+            )
+            active_ids.update(
+                Game.objects.filter(created_at__gte=since).values_list("created_by_id", flat=True)
+            )
+            active_ids.update(
+                TrainingSession.objects.filter(created_at__gte=since).values_list("user_id", flat=True)
+            )
+            return len([user_id for user_id in active_ids if user_id])
+
+        user_metrics = {
+            "total": User.objects.count(),
+            "new_last_24h": User.objects.filter(created_at__gte=day_ago).count(),
+            "new_last_7d": User.objects.filter(created_at__gte=week_ago).count(),
+            "active_last_24h": active_user_count(day_ago),
+            "active_last_7d": active_user_count(week_ago),
+        }
+
+        usage_metrics = {
+            "installs_total": AppUsageEvent.objects.filter(event_type=AppUsageEvent.EventType.INSTALL).count(),
+            "installs_last_7d": AppUsageEvent.objects.filter(
+                event_type=AppUsageEvent.EventType.INSTALL, occurred_at__gte=week_ago
+            ).count(),
+            "session_starts_last_24h": AppUsageEvent.objects.filter(
+                event_type=AppUsageEvent.EventType.SESSION_START, occurred_at__gte=day_ago
+            ).count(),
+            "session_starts_last_7d": AppUsageEvent.objects.filter(
+                event_type=AppUsageEvent.EventType.SESSION_START, occurred_at__gte=week_ago
+            ).count(),
+            "platform_breakdown_last_7d": {
+                (item["platform"] or "unknown"): item["count"]
+                for item in AppUsageEvent.objects.filter(
+                    event_type=AppUsageEvent.EventType.INSTALL, occurred_at__gte=week_ago
+                )
+                .values("platform")
+                .annotate(count=Count("id"))
+            },
+        }
+
+        games_metrics = {
+            "total": Game.objects.count(),
+            "created_last_7d": Game.objects.filter(created_at__gte=week_ago).count(),
+            "completed_last_7d": Game.objects.filter(
+                status=Game.Status.COMPLETED, completed_at__gte=week_ago
+            ).count(),
+            "in_progress": Game.objects.filter(status=Game.Status.IN_PROGRESS).count(),
+        }
+
+        training_metrics = {
+            "total": TrainingSession.objects.count(),
+            "created_last_7d": TrainingSession.objects.filter(created_at__gte=week_ago).count(),
+            "completed_last_7d": TrainingSession.objects.filter(
+                status=TrainingSession.Status.COMPLETED, completed_at__gte=week_ago
+            ).count(),
+            "in_progress": TrainingSession.objects.filter(status=TrainingSession.Status.IN_PROGRESS).count(),
+        }
+
+        recent_events = [
+            {
+                "id": event.id,
+                "event_type": event.event_type,
+                "user_id": event.user_id,
+                "platform": event.platform,
+                "app_version": event.app_version,
+                "occurred_at": event.occurred_at,
+                "metadata": event.metadata,
+            }
+            for event in AppUsageEvent.objects.select_related("user").order_by("-occurred_at")[:25]
+        ]
+
+        payload = {
+            "users": user_metrics,
+            "usage": usage_metrics,
+            "games": games_metrics,
+            "training": training_metrics,
+            "recent_events": recent_events,
+        }
+
+        return Response(payload, status=status.HTTP_200_OK)

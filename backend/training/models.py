@@ -18,9 +18,12 @@ class TrainingSession(models.Model):
     user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="training_sessions")
     mode = models.CharField(max_length=30, choices=Mode.choices)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.IN_PROGRESS)
-    settings = models.JSONField(default=dict)
+    settings = models.JSONField(default=dict)  # includes customization: duration_minutes, target, difficulty
+    duration_minutes = models.IntegerField(default=30, null=True, blank=True)  # Timer in minutes
+    elapsed_seconds = models.IntegerField(default=0)  # How long user has been practicing
     final_score = models.IntegerField(null=True, blank=True)
     success_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    xp_earned = models.IntegerField(default=0)  # XP earned in this session
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

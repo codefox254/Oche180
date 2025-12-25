@@ -290,7 +290,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                         if (game['average_per_dart'] != null)
                           Text(
                             'Avg: ${game['average_per_dart']}',
-                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                            style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
                           ),
                       ],
                     ),
@@ -298,7 +298,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   if (game['highest_score'] != null)
                     Text(
                       'High: ${game['highest_score']}',
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                      style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
                     ),
                 ],
               ),
@@ -332,14 +332,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                         Text(pb['category'] ?? 'Achievement', style: AppTextStyles.bodyLarge),
                         Text(
                           pb['description'] ?? '',
-                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                          style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
                         ),
                       ],
                     ),
                   ),
                   Text(
                     '${pb['value'] ?? ''}',
-                    style: AppTextStyles.titleMedium.copyWith(color: AppColors.primary),
+                    style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary),
                   ),
                 ],
               ),
@@ -400,7 +400,7 @@ class _StatItem extends StatelessWidget {
         ),
         Text(
           label,
-          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
         ),
       ],
     );

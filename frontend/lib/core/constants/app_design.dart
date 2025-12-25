@@ -30,6 +30,11 @@ class AppColors {
     Color(0xFF00D9FF),
   ];
   
+  static const List<Color> secondaryGradient = [
+    Color(0xFF00D9FF),
+    Color(0xFF0099FF),
+  ];
+  
   static const List<Color> accentGradient = [
     Color(0xFFFF006E),
     Color(0xFFFFAA00),

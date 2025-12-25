@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,6 +12,10 @@ import '../features/statistics/presentation/statistics_screen.dart';
 import '../features/rules/presentation/game_rules_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/presentation/splash_screen.dart';
+import '../features/tournaments/screens/tournaments_screen.dart';
+import '../features/tournaments/screens/create_tournament_screen.dart';
+import '../features/tournaments/screens/tournament_detail_screen.dart';
+import '../features/tournaments/screens/manage_entries_screen.dart';
 
 class AppRoute {
   const AppRoute._(this.name, this.path);
@@ -104,6 +107,28 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/game-rules',
         builder: (context, state) => const GameRulesScreen(),
+      ),
+      GoRoute(
+        path: '/tournaments',
+        builder: (context, state) => const TournamentsScreen(),
+      ),
+      GoRoute(
+        path: '/tournaments/create',
+        builder: (context, state) => const CreateTournamentScreen(),
+      ),
+      GoRoute(
+        path: '/tournaments/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
+          return TournamentDetailScreen(tournamentId: id);
+        },
+      ),
+      GoRoute(
+        path: '/tournaments/:id/manage',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
+          return ManageEntriesScreen(tournamentId: id);
+        },
       ),
     ],
   );

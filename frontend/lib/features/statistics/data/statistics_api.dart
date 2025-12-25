@@ -7,10 +7,13 @@ class StatisticsApi {
 
   StatisticsApi({required this.baseUrl, this.authToken});
 
-  Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        if (authToken != null) 'Authorization': 'Bearer $authToken',
-      };
+  Map<String, String> get _headers {
+    final headers = {'Content-Type': 'application/json'};
+    if (authToken != null) {
+      headers['Authorization'] = 'Bearer $authToken';
+    }
+    return headers;
+  }
 
   Future<Map<String, dynamic>> fetchStatsSummary() async {
     final response = await http.get(

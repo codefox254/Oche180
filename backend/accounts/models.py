@@ -54,3 +54,27 @@ class User(AbstractUser):
 
     def __str__(self) -> str:  # pragma: no cover - trivial representation
         return self.email or "User"
+
+
+class UserProfile(models.Model):
+    """Extended user profile with gamification features: streaks, XP, levels"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    
+    # Gamification
+    total_xp = models.IntegerField(default=0)
+    level = models.IntegerField(default=1)
+    
+    # Streak tracking
+    current_streak = models.IntegerField(default=0)  # Days in a row
+    longest_streak = models.IntegerField(default=0)
+    last_login_date = models.DateField(null=True, blank=True)
+    
+    # Stats
+    total_training_sessions = models.IntegerField(default=0)
+    total_games_played = models.IntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.user.email} - Level {self.level} ({self.total_xp} XP)"

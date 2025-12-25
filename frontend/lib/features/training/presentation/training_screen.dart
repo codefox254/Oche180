@@ -132,7 +132,7 @@ class _TrainingScreenState extends State<TrainingScreen> with SingleTickerProvid
         child: SafeArea(
           child: Column(
             children: [
-              // Top bar
+              // Top bar with stats
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
                 child: Row(
@@ -142,7 +142,21 @@ class _TrainingScreenState extends State<TrainingScreen> with SingleTickerProvid
                       onPressed: () => context.pop(),
                     ),
                     const SizedBox(width: AppSpacing.sm),
-                    Text('Training', style: AppTextStyles.headlineMedium),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Training', style: AppTextStyles.headlineMedium),
+                          Row(
+                            children: [
+                              Icon(Icons.flash_on, color: AppColors.warning, size: 16),
+                              const SizedBox(width: 4),
+                              Text('🔥 Streak • 💛 XP', style: AppTextStyles.labelSmall),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

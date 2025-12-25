@@ -127,7 +127,7 @@ class _GameRulesScreenState extends State<GameRulesScreen> {
                 ),
                 child: Text(
                   mode['difficulty'] as String,
-                  style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary),
+                  style: AppTextStyles.labelLarge.copyWith(color: AppColors.primary),
                 ),
               ),
             ],

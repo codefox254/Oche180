@@ -63,7 +63,7 @@ class HomeScreen extends StatelessWidget {
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.person_outline, color: AppColors.primary),
-                    onPressed: () {},
+                    onPressed: () => context.push('/profile'),
                   ),
                 ],
               ),
@@ -206,6 +206,28 @@ class _QuickActions extends StatelessWidget {
                 label: 'Training',
                 gradient: AppColors.accentGradient,
                 onTap: () => context.push('/training'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionCard(
+                icon: Icons.emoji_events,
+                label: 'Tournaments',
+                gradient: AppColors.secondaryGradient,
+                onTap: () => context.push('/tournaments'),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _ActionCard(
+                icon: Icons.bar_chart,
+                label: 'Statistics',
+                gradient: [const Color(0xFF6366F1), const Color(0xFF8B5CF6)],
+                onTap: () => context.push('/statistics'),
               ),
             ),
           ],
@@ -563,7 +585,7 @@ class _FooterNavigation extends StatelessWidget {
                 icon: Icons.bar_chart,
                 label: 'Stats',
                 isActive: false,
-                onTap: () {},
+                onTap: () => context.push('/statistics'),
               ),
               _FooterTab(
                 icon: Icons.person,

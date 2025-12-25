@@ -7,10 +7,13 @@ class TrainingApi {
   final String baseUrl; // e.g., http://127.0.0.1:8000/api
   final String? authToken;
 
-  Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        if (authToken != null) 'Authorization': 'Bearer $authToken',
-      };
+  Map<String, String> get _headers {
+    final headers = {'Content-Type': 'application/json'};
+    if (authToken != null) {
+      headers['Authorization'] = 'Bearer $authToken';
+    }
+    return headers;
+  }
 
   Future<List<Map<String, dynamic>>> fetchPrograms() async {
     final res = await http.get(Uri.parse('$baseUrl/training/programs/'), headers: _headers);
@@ -39,13 +42,18 @@ class TrainingApi {
     throw Exception('Failed to load challenges: ${res.statusCode}');
   }
 
-  Future<Map<String, dynamic>> startSession({required String mode, Map<String, dynamic>? settings}) async {
+  Future<Map<String, dynamic>> startSession({
+    required String mode,
+    Map<String, dynamic>? settings,
+    int? durationMinutes,
+  }) async {
     final res = await http.post(
       Uri.parse('$baseUrl/training/sessions/'),
       headers: _headers,
       body: jsonEncode({
         'mode': mode,
         'settings': settings ?? {},
+        'duration_minutes': durationMinutes ?? 30,  // Default 30 minutes
       }),
     );
     if (res.statusCode == 201) {
@@ -71,13 +79,19 @@ class TrainingApi {
     }
   }
 
-  Future<Map<String, dynamic>> completeSession({required int sessionId, int? finalScore, double? successRate}) async {
+  Future<Map<String, dynamic>> completeSession({
+    required int sessionId,
+    int? finalScore,
+    double? successRate,
+    int? elapsedSeconds,
+  }) async {
     final res = await http.patch(
       Uri.parse('$baseUrl/training/sessions/$sessionId/complete/'),
       headers: _headers,
       body: jsonEncode({
         if (finalScore != null) 'final_score': finalScore,
         if (successRate != null) 'success_rate': successRate,
+        if (elapsedSeconds != null) 'elapsed_seconds': elapsedSeconds,
       }),
     );
     if (res.statusCode == 200) {
