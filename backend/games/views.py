@@ -186,6 +186,7 @@ def update_user_statistics(user, game, players_data):
         if current_player_data:
             # Update game counts
             stats.total_games += 1
+            profile.total_games_played += 1  # Keep profile in sync
             if is_winner:
                 stats.total_wins += 1
                 profile.total_xp += 100  # Award XP for win

@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
-import '../services/tournament_service.dart';
-import '../../../core/services/api_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-class CreateTournamentScreen extends StatefulWidget {
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/services/api_service.dart';
+import '../services/tournament_service.dart';
+
+class CreateTournamentScreen extends ConsumerStatefulWidget {
   const CreateTournamentScreen({super.key});
 
   @override
-  State<CreateTournamentScreen> createState() => _CreateTournamentScreenState();
+  ConsumerState<CreateTournamentScreen> createState() => _CreateTournamentScreenState();
 }
 
-class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
+class _CreateTournamentScreenState extends ConsumerState<CreateTournamentScreen> {
   final _formKey = GlobalKey<FormState>();
   late TournamentService _tournamentService;
   
@@ -21,6 +25,10 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   bool _requireApproval = false;
   bool _isFeatured = false;
   DateTime? _startTime;
+
+  // Registration window offsets relative to start time
+  final Duration _registrationLead = const Duration(days: 1);
+  final Duration _registrationCloseBeforeStart = const Duration(hours: 1);
   
   String? _minSkillLevel;
   String? _maxSkillLevel;
@@ -66,7 +74,10 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   @override
   void initState() {
     super.initState();
-    _tournamentService = TournamentService(ApiService());
+    final auth = ref.read(authProvider);
+    _tournamentService = TournamentService(
+      ApiService(authToken: auth.token),
+    );
   }
 
   @override
@@ -109,21 +120,74 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       return;
     }
 
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.token == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to create a tournament.')),
+        );
+        context.push('/auth/login');
+      }
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
 
     try {
+      final now = DateTime.now();
+      final start = _startTime ?? now.add(const Duration(days: 2));
+      final registrationStart = start.subtract(_registrationLead);
+      final registrationEnd = start.subtract(_registrationCloseBeforeStart);
+
+      // Map UI format/skill values to backend enums
+      final formatMap = {
+        'single_elimination': 'SINGLE_ELIM',
+        'double_elimination': 'DOUBLE_ELIM',
+        'round_robin': 'ROUND_ROBIN',
+        'swiss': 'SWISS',
+        'groups_knockout': 'GROUPS_KO',
+        'ladder': 'LADDER',
+        'free_for_all': 'FFA',
+      };
+
+      String? mapSkill(String? skill) {
+        if (skill == null) return null;
+        switch (skill) {
+          case 'beginner':
+            return 'BEGINNER';
+          case 'intermediate':
+            return 'INTERMEDIATE';
+          case 'advanced':
+            return 'ADVANCED';
+          case 'expert':
+          case 'master':
+            return 'PROFESSIONAL';
+          default:
+            return null;
+        }
+      }
+
       final data = {
         'name': _nameController.text,
         'description': _descriptionController.text,
-        'format': _selectedFormat,
+        'tournament_format': formatMap[_selectedFormat] ?? 'SINGLE_ELIM',
+        'game_mode': '501',
+        'game_settings': {},
         'max_participants': _maxParticipants,
+        'min_participants': 4,
+        'allow_public_registration': true,
         'require_approval': _requireApproval,
         'is_featured': _isFeatured,
-        if (_startTime != null) 'start_time': _startTime!.toIso8601String(),
-        if (_minSkillLevel != null) 'min_skill_level': _minSkillLevel,
-        if (_maxSkillLevel != null) 'max_skill_level': _maxSkillLevel,
+        'registration_start': registrationStart.toIso8601String(),
+        'registration_end': registrationEnd.toIso8601String(),
+        'start_time': start.toIso8601String(),
+        'estimated_duration_hours': 2,
+        'prize_pool': '0',
+        'prize_description': '',
+        'winner_xp_reward': 500,
+        if (_minSkillLevel != null) 'min_skill_level': mapSkill(_minSkillLevel),
       };
 
       await _tournamentService.createTournament(data);

@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.db.models import F, Sum, Count, Max
+from django.db.models import F, Sum, Count, Max, FloatField
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -47,12 +47,12 @@ class StatsSummaryView(APIView):
         stats_qs = GameStatistics.objects.filter(game_player__in=player_qs)
 
         totals = stats_qs.aggregate(
-            darts=Coalesce(Sum("total_throws"), 0),
-            points_weighted=Coalesce(Sum(F("average_per_dart") * F("total_throws")), 0.0),
-            best_avg=Coalesce(Max("average_per_round"), 0.0),
-            sum_180=Coalesce(Sum("count_180s"), 0),
-            sum_140=Coalesce(Sum("count_140_plus"), 0),
-            sum_100=Coalesce(Sum("count_100_plus"), 0),
+            darts=Coalesce(Sum("total_throws"), 0, output_field=FloatField()),
+            points_weighted=Coalesce(Sum(F("average_per_dart") * F("total_throws")), 0.0, output_field=FloatField()),
+            best_avg=Coalesce(Max("average_per_round"), 0.0, output_field=FloatField()),
+            sum_180=Coalesce(Sum("count_180s"), 0, output_field=FloatField()),
+            sum_140=Coalesce(Sum("count_140_plus"), 0, output_field=FloatField()),
+            sum_100=Coalesce(Sum("count_100_plus"), 0, output_field=FloatField()),
         )
 
         overall_avg = float(totals["points_weighted"] / totals["darts"]) if totals["darts"] else 0.0
@@ -100,6 +100,15 @@ class StatsSummaryView(APIView):
             "stats_by_mode": stats_by_mode,
             "recent_form": recent_list,
         }
+
+        # Include profile level and XP if available
+        try:
+            from accounts.models import UserProfile
+            profile = UserProfile.objects.get(user=user)
+            payload["level"] = profile.level
+            payload["total_xp"] = profile.total_xp
+        except UserProfile.DoesNotExist:
+            pass
 
         return Response(payload, status=status.HTTP_200_OK)
 

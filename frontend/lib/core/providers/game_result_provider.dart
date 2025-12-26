@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/game_results_service.dart';
-import '../services/auth_service.dart';
 import '../providers/auth_provider.dart';
 
 // Game results service provider
@@ -9,16 +8,11 @@ final gameResultsServiceProvider = Provider((ref) {
 });
 
 // Notifier for game result submission
-class GameResultNotifier extends StateNotifier<AsyncValue<Map<String, dynamic>>> {
-  final GameResultsService _gameResultsService;
-  final AuthService _authService;
-  final Ref _ref;
-
-  GameResultNotifier(
-    this._gameResultsService,
-    this._authService,
-    this._ref,
-  ) : super(const AsyncValue.data({}));
+class GameResultNotifier extends AsyncNotifier<Map<String, dynamic>> {
+  @override
+  Future<Map<String, dynamic>> build() async {
+    return {};
+  }
 
   Future<void> submitGameResult({
     required String gameType,
@@ -29,13 +23,14 @@ class GameResultNotifier extends StateNotifier<AsyncValue<Map<String, dynamic>>>
     state = const AsyncValue.loading();
 
     try {
-      final authState = _ref.read(authProvider);
+      final authState = ref.read(authProvider);
       
       if (authState.token == null) {
         throw Exception('User not authenticated');
       }
 
-      final result = await _gameResultsService.submitGameResult(
+      final gameResultsService = ref.read(gameResultsServiceProvider);
+      final result = await gameResultsService.submitGameResult(
         token: authState.token!,
         gameType: gameType,
         isTraining: isTraining,
@@ -45,8 +40,8 @@ class GameResultNotifier extends StateNotifier<AsyncValue<Map<String, dynamic>>>
 
       state = AsyncValue.data(result);
       
-      // Refresh user statistics after game submission
-      _ref.refresh(authProvider);
+      // Invalidate auth provider to refresh statistics
+      ref.invalidate(authProvider);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -54,24 +49,11 @@ class GameResultNotifier extends StateNotifier<AsyncValue<Map<String, dynamic>>>
 }
 
 // Game result provider
-final gameResultProvider = StateNotifierProvider<
-    GameResultNotifier,
-    AsyncValue<Map<String, dynamic>>>((ref) {
-  return GameResultNotifier(
-    ref.watch(gameResultsServiceProvider),
-    ref.watch(Provider((ref) => AuthService())),
-    ref,
-  );
+final gameResultProvider = AsyncNotifierProvider<GameResultNotifier, Map<String, dynamic>>(() {
+  return GameResultNotifier();
 });
 
 // Provider to track last game result
-final lastGameResultProvider =
-    StateNotifierProvider<GameResultNotifier, AsyncValue<Map<String, dynamic>>>(
-  (ref) {
-    return GameResultNotifier(
-      ref.watch(gameResultsServiceProvider),
-      ref.watch(Provider((ref) => AuthService())),
-      ref,
-    );
-  },
-);
+final lastGameResultProvider = AsyncNotifierProvider<GameResultNotifier, Map<String, dynamic>>(() {
+  return GameResultNotifier();
+});

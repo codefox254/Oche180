@@ -214,6 +214,11 @@ class TournamentCreateSerializer(serializers.ModelSerializer):
         
         return data
 
+    def create(self, validated_data):
+        """Ensure newly created tournaments start with registration open."""
+        validated_data.setdefault("status", Tournament.Status.REGISTRATION_OPEN)
+        return Tournament.objects.create(**validated_data)
+
 
 class TournamentInvitationSerializer(serializers.ModelSerializer):
     """Serializer for tournament invitations"""

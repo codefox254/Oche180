@@ -12,18 +12,22 @@ class TournamentService {
     String? format,
     bool? featured,
   }) async {
-    final queryParams = <String, String>{};
-    if (status != null) queryParams['status'] = status;
-    if (format != null) queryParams['format'] = format;
-    if (featured != null) queryParams['is_featured'] = featured.toString();
+      try {
+        final queryParams = <String, String>{};
+        if (status != null) queryParams['status'] = status;
+        if (format != null) queryParams['format'] = format;
+        if (featured != null) queryParams['is_featured'] = featured.toString();
 
-    final response = await _apiService.get(
-      'tournaments/',
-      queryParameters: queryParams,
-    );
+        final response = await _apiService.get(
+          'tournaments/',
+          queryParameters: queryParams,
+        );
 
-    final List<dynamic> data = response;
-    return data.map((json) => Tournament.fromJson(json)).toList();
+        final List<dynamic> data = response;
+        return data.map((json) => Tournament.fromJson(json)).toList();
+      } catch (e) {
+        return [];
+      }
   }
 
   // Get featured tournaments
@@ -35,16 +39,27 @@ class TournamentService {
 
   // Get upcoming tournaments
   Future<List<Tournament>> getUpcomingTournaments() async {
-    final response = await _apiService.get('tournaments/upcoming/');
-    final List<dynamic> data = response;
-    return data.map((json) => Tournament.fromJson(json)).toList();
+    try {
+      final response = await _apiService.get(
+        'tournaments/',
+        queryParameters: {'status': 'upcoming'},
+      );
+      final List<dynamic> data = response;
+      return data.map((json) => Tournament.fromJson(json)).toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   // Get my tournaments
   Future<List<Tournament>> getMyTournaments() async {
-    final response = await _apiService.get('tournaments/my_tournaments/');
-    final List<dynamic> data = response;
-    return data.map((json) => Tournament.fromJson(json)).toList();
+    try {
+      final response = await _apiService.get('tournaments/my_tournaments/');
+      final List<dynamic> data = response;
+      return data.map((json) => Tournament.fromJson(json)).toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   // Get tournament details

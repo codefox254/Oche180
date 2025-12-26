@@ -45,27 +45,33 @@ class _LiveTournamentsScreenState extends ConsumerState<LiveTournamentsScreen>
 
     try {
       final authState = ref.read(authProvider);
-      if (!authState.isAuthenticated || authState.token == null) {
-        setState(() {
-          _error = 'Please login to view tournaments';
-          _loading = false;
-        });
-        return;
-      }
 
-      final live = await _service.getLiveMatches(authState.token!);
-      final upcoming = await _service.getTournaments(authState.token!, status: 'upcoming');
-      final my = await _service.getTournaments(authState.token!);
+        // Get tournaments (handle both authenticated and unauthenticated)
+        final token = authState.isAuthenticated ? authState.token : '';
+      
+        final live = await _service.getTournaments(token ?? '', status: 'in_progress');
+        final upcoming = await _service.getTournaments(token ?? '', status: 'upcoming');
+        final my = authState.isAuthenticated 
+          ? await _service.getTournaments(token!, status: null)
+          : <dynamic>[];
+
+      if (!mounted) return;
 
       setState(() {
         _liveMatches = live;
         _upcomingTournaments = upcoming;
-        _myTournaments = my.where((t) => t['is_participant'] == true).toList();
+        _myTournaments = authState.isAuthenticated 
+          ? my.where((t) => t['is_participant'] == true).toList()
+          : [];
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = 'Failed to load data: $e';
+        // Don't show error for empty results, just set empty lists
+        _liveMatches = [];
+        _upcomingTournaments = [];
+        _myTournaments = [];
         _loading = false;
       });
     }
@@ -189,6 +195,10 @@ class _LiveTournamentsScreenState extends ConsumerState<LiveTournamentsScreen>
   }
 
   Widget _buildLiveMatchesTab() {
+        if (_liveMatches.isEmpty) {
+          return _buildEmptyState('No live tournaments at the moment', Icons.sports_esports);
+        }
+    
     if (_liveMatches.isEmpty) {
       return _buildEmptyState('No live matches', Icons.sports_esports);
     }

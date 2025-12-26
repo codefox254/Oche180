@@ -2,20 +2,25 @@ class Tournament {
   final int id;
   final String name;
   final String description;
-  final String format;
+  final String tournamentFormat;
   final String status;
+  final String gameMode;
   final int organizerId;
   final String organizerName;
-  final int? gameId;
-  final String? gameName;
-  final DateTime? startTime;
-  final DateTime? endTime;
   final int maxParticipants;
-  final int currentParticipants;
+  final int participantCount;
+  final int spotsRemaining;
+  final bool isRegistrationOpen;
+  final bool isFeatured;
+  final bool requireApproval;
   final String? minSkillLevel;
   final String? maxSkillLevel;
-  final bool requireApproval;
-  final bool isFeatured;
+  final String? gameName;
+  final DateTime registrationStart;
+  final DateTime registrationEnd;
+  final DateTime startTime;
+  final num prizePool;
+  final String? bannerImage;
   final DateTime createdAt;
   final DateTime updatedAt;
   final Map<String, dynamic>? settings;
@@ -24,20 +29,25 @@ class Tournament {
     required this.id,
     required this.name,
     required this.description,
-    required this.format,
+    required this.tournamentFormat,
     required this.status,
+    required this.gameMode,
     required this.organizerId,
     required this.organizerName,
-    this.gameId,
-    this.gameName,
-    this.startTime,
-    this.endTime,
     required this.maxParticipants,
-    required this.currentParticipants,
+    required this.participantCount,
+    required this.spotsRemaining,
+    required this.isRegistrationOpen,
+    required this.isFeatured,
+    required this.requireApproval,
     this.minSkillLevel,
     this.maxSkillLevel,
-    required this.requireApproval,
-    required this.isFeatured,
+    this.gameName,
+    required this.registrationStart,
+    required this.registrationEnd,
+    required this.startTime,
+    required this.prizePool,
+    this.bannerImage,
     required this.createdAt,
     required this.updatedAt,
     this.settings,
@@ -46,22 +56,27 @@ class Tournament {
   factory Tournament.fromJson(Map<String, dynamic> json) {
     return Tournament(
       id: json['id'],
-      name: json['name'],
-      description: json['description'],
-      format: json['format'],
-      status: json['status'],
+      name: json['name'] ?? '',
+      description: json['description'] ?? '',
+      tournamentFormat: json['tournament_format'] ?? json['format'] ?? '',
+      status: json['status'] ?? '',
+      gameMode: json['game_mode'] ?? '',
       organizerId: json['organizer_id'] ?? json['organizer'],
       organizerName: json['organizer_name'] ?? '',
-      gameId: json['game_id'],
-      gameName: json['game_name'],
-      startTime: json['start_time'] != null ? DateTime.parse(json['start_time']) : null,
-      endTime: json['end_time'] != null ? DateTime.parse(json['end_time']) : null,
-      maxParticipants: json['max_participants'],
-      currentParticipants: json['current_participants'] ?? 0,
+      maxParticipants: json['max_participants'] ?? 0,
+      participantCount: json['participant_count'] ?? json['current_participants'] ?? 0,
+      spotsRemaining: json['spots_remaining'] ?? 0,
+      isRegistrationOpen: json['is_registration_open'] ?? false,
+      isFeatured: json['is_featured'] ?? false,
+      requireApproval: json['require_approval'] ?? false,
       minSkillLevel: json['min_skill_level'],
       maxSkillLevel: json['max_skill_level'],
-      requireApproval: json['require_approval'],
-      isFeatured: json['is_featured'],
+      gameName: json['game_name'],
+      registrationStart: DateTime.parse(json['registration_start']),
+      registrationEnd: DateTime.parse(json['registration_end']),
+      startTime: DateTime.parse(json['start_time']),
+      prizePool: json['prize_pool'] ?? 0,
+      bannerImage: json['banner_image'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       settings: json['settings'],
@@ -73,66 +88,75 @@ class Tournament {
       'id': id,
       'name': name,
       'description': description,
-      'format': format,
+      'tournament_format': tournamentFormat,
       'status': status,
+      'game_mode': gameMode,
       'organizer': organizerId,
-      'game': gameId,
-      'start_time': startTime?.toIso8601String(),
-      'end_time': endTime?.toIso8601String(),
+      'registration_start': registrationStart.toIso8601String(),
+      'registration_end': registrationEnd.toIso8601String(),
+      'start_time': startTime.toIso8601String(),
       'max_participants': maxParticipants,
+      'participant_count': participantCount,
+      'spots_remaining': spotsRemaining,
+      'is_registration_open': isRegistrationOpen,
+      'is_featured': isFeatured,
+      'require_approval': requireApproval,
       'min_skill_level': minSkillLevel,
       'max_skill_level': maxSkillLevel,
-      'require_approval': requireApproval,
-      'is_featured': isFeatured,
+      'game_name': gameName,
+      'prize_pool': prizePool,
+      'banner_image': bannerImage,
       'settings': settings,
     };
   }
 
   String get formatDisplay {
-    switch (format) {
-      case 'single_elimination':
+    switch (tournamentFormat) {
+      case 'SINGLE_ELIM':
         return 'Single Elimination';
-      case 'double_elimination':
+      case 'DOUBLE_ELIM':
         return 'Double Elimination';
-      case 'round_robin':
+      case 'ROUND_ROBIN':
         return 'Round Robin';
-      case 'swiss':
+      case 'SWISS':
         return 'Swiss System';
-      case 'groups_knockout':
+      case 'GROUPS_KO':
         return 'Groups + Knockout';
-      case 'ladder':
+      case 'LADDER':
         return 'Ladder';
-      case 'free_for_all':
+      case 'FFA':
         return 'Free for All';
       default:
-        return format;
+        return tournamentFormat;
     }
   }
 
   String get statusDisplay {
     switch (status) {
-      case 'pending':
-        return 'Pending';
-      case 'registration':
+      case 'REG_OPEN':
         return 'Registration Open';
-      case 'in_progress':
+      case 'REG_CLOSED':
+        return 'Registration Closed';
+      case 'IN_PROGRESS':
         return 'In Progress';
-      case 'completed':
+      case 'COMPLETED':
         return 'Completed';
-      case 'cancelled':
+      case 'CANCELLED':
         return 'Cancelled';
+      case 'PAUSED':
+        return 'Paused';
+      case 'DRAFT':
+        return 'Draft';
       default:
         return status;
     }
   }
 
-  bool get isRegistrationOpen {
-    return status == 'registration' || status == 'pending';
+  bool get canRegister {
+    return isRegistrationOpen && participantCount < maxParticipants;
   }
 
-  bool get canRegister {
-    return isRegistrationOpen && currentParticipants < maxParticipants;
-  }
+  int get currentParticipants => participantCount;
 }
 
 class TournamentEntry {

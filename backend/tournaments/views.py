@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, status
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
@@ -34,7 +35,7 @@ class IsOrganizerOrReadOnly(permissions.BasePermission):
 class TournamentViewSet(viewsets.ModelViewSet):
     """ViewSet for tournaments"""
     queryset = Tournament.objects.all()
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.AllowAny]
     
     def get_serializer_class(self):
         if self.action == "list":
@@ -46,18 +47,44 @@ class TournamentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter private tournaments unless user is organizer or participant"""
         queryset = super().get_queryset()
+        # Handle status filtering from query params
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            status_map = {
+                'in_progress': Tournament.Status.IN_PROGRESS,
+                'completed': Tournament.Status.COMPLETED,
+                'registration_open': Tournament.Status.REGISTRATION_OPEN,
+            }
+            if status_param in status_map:
+                queryset = queryset.filter(status=status_map[status_param])
+            elif status_param == 'upcoming':
+                # Upcoming includes registration open/closed and start time in the future
+                now = timezone.now()
+                queryset = queryset.filter(
+                    start_time__gt=now,
+                    status__in=[Tournament.Status.REGISTRATION_OPEN, Tournament.Status.REGISTRATION_CLOSED]
+                )
         
-        # For list/upcoming/featured, filter out private tournaments unless user has access
+        # For list/upcoming/featured, filter out private tournaments unless user has access.
+        # Be tolerant of invalid/expired auth headers: treat as anonymous instead of 401.
         if self.action in ['list', 'upcoming', 'featured']:
-            if self.request.user.is_authenticated:
+            try:
+                user = self.request.user  # may trigger auth
+                is_auth = bool(getattr(user, "is_authenticated", False))
+            except Exception:
+                # Authentication failed (e.g., invalid token) — proceed as anonymous
+                user = None
+                is_auth = False
+
+            if is_auth:
                 # Show public tournaments + user's own tournaments (organized or participating)
                 user_tournament_ids = TournamentEntry.objects.filter(
-                    player=self.request.user
+                    player=user
                 ).values_list('tournament_id', flat=True)
-                
+
                 queryset = queryset.filter(
                     Q(is_private=False) |
-                    Q(organizer=self.request.user) |
+                    Q(organizer=user) |
                     Q(id__in=user_tournament_ids)
                 )
             else:
@@ -65,6 +92,16 @@ class TournamentViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(is_private=False)
         
         return queryset
+
+    def perform_authentication(self, request):
+        """Attempt auth, but don't fail safe methods on bad/expired tokens."""
+        if request.method in permissions.SAFE_METHODS:
+            try:
+                return super().perform_authentication(request)
+            except AuthenticationFailed:
+                request._not_authenticated()
+                return None
+        return super().perform_authentication(request)
     
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update", "destroy"]:

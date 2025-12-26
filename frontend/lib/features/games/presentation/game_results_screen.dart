@@ -47,30 +47,28 @@ class _GameResultsScreenState extends ConsumerState<GameResultsScreen>
     final playersResults =
         widget.gameResult['players_results'] as List<dynamic>? ?? [];
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: AppColors.primaryGradient,
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: AppColors.primaryGradient,
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Header with game type
-                  ScaleTransition(
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: ScaleTransition(
                     scale: _scaleAnimation,
                     child: Column(
                       children: [
-                        const SizedBox(height: AppSpacing.lg),
                         const DartboardIcon(size: 64, color: Colors.white),
-                        const SizedBox(height: AppSpacing.lg),
+                        const SizedBox(height: AppSpacing.md),
                         Text(
                           'Game Complete!',
                           style: AppTextStyles.titleLarge.copyWith(
@@ -78,7 +76,7 @@ class _GameResultsScreenState extends ConsumerState<GameResultsScreen>
                             fontSize: 32,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.sm),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           gameType,
                           style: AppTextStyles.bodyLarge.copyWith(
@@ -89,99 +87,192 @@ class _GameResultsScreenState extends ConsumerState<GameResultsScreen>
                       ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-
-                  // Players Results
-                  if (playersResults.isNotEmpty)
-                    Column(
-                      children: [
-                        Text(
-                          'Final Standings',
-                          style: AppTextStyles.titleLarge
-                              .copyWith(color: Colors.white),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        ...List.generate(
-                          playersResults.length,
-                          (index) => _PlayerResultCard(
-                            playerData: playersResults[index],
-                            position: index + 1,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                  const SizedBox(height: AppSpacing.xl),
-
-                  // Comprehensive Statistics Section
-                  if (playersResults.isNotEmpty &&
-                      (playersResults[0]['is_current_user'] == true ||
-                          playersResults.any((p) => p['is_current_user'] == true)))
-                    Column(
-                      children: [
-                        Text(
-                          'Your Game Statistics',
-                          style: AppTextStyles.titleLarge
-                              .copyWith(color: Colors.white),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        ...List.generate(
-                          playersResults.length,
-                          (index) {
-                            final player = playersResults[index];
-                            if (player['is_current_user'] == true) {
-                              return _ComprehensiveStatsCard(
-                                playerData: player,
-                              );
-                            }
-                            return SizedBox.shrink();
-                          },
-                        ),
-                      ],
-                    ),
-
-                  const SizedBox(height: AppSpacing.xl),
-
-                  // Action Buttons
-                  Row(
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppBorderRadius.lg),
+                  ),
+                  child: const TabBar(
+                    indicatorColor: Colors.white,
+                    tabs: [
+                      Tab(text: 'Summary'),
+                      Tab(text: 'Game stats'),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: TabBarView(
                     children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.home),
-                          label: const Text('Home'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
+                      _SummaryTab(
+                        playersResults: playersResults,
+                        onClose: () => Navigator.pop(context),
                       ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            // Navigate to stats screen
-                            Navigator.pop(context);
-                          },
-                          icon: const Icon(Icons.bar_chart),
-                          label: const Text('View Stats'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.accent,
-                            foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
+                      _StatsTab(
+                        gameResult: widget.gameResult,
+                        playersResults: playersResults,
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SummaryTab extends StatelessWidget {
+  final List<dynamic> playersResults;
+  final VoidCallback onClose;
+
+  const _SummaryTab({
+    required this.playersResults,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCurrentUser = playersResults.any((p) => p['is_current_user'] == true);
+
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: ListView(
+        children: [
+          if (playersResults.isNotEmpty) ...[
+            Text(
+              'Final standings',
+              style: AppTextStyles.titleLarge.copyWith(color: Colors.white),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            ...List.generate(
+              playersResults.length,
+              (index) => _PlayerResultCard(
+                playerData: playersResults[index],
+                position: index + 1,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+          ],
+          if (hasCurrentUser)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your game statistics',
+                  style: AppTextStyles.titleLarge.copyWith(color: Colors.white),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ...playersResults.map((p) {
+                  if (p['is_current_user'] == true) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: _ComprehensiveStatsCard(playerData: p),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                }),
+                const SizedBox(height: AppSpacing.lg),
+              ],
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.home),
+                  label: const Text('Home'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.bar_chart),
+                  label: const Text('View stats'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatsTab extends StatelessWidget {
+  final Map<String, dynamic> gameResult;
+  final List<dynamic> playersResults;
+
+  const _StatsTab({
+    required this.gameResult,
+    required this.playersResults,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final quickGames = (gameResult['quick_games'] ?? gameResult['quick_play_games'] ?? 0) as int;
+    final totalGamesBase = (gameResult['total_games'] ?? gameResult['games_played'] ?? 0) as int;
+    final totalGames = totalGamesBase + quickGames;
+    final legsPlayed = gameResult['legs_played'] ?? gameResult['total_legs'] ?? 0;
+    final matchesPlayed = gameResult['matches_played'] ?? totalGames;
+
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: ListView(
+        children: [
+          Text(
+            'Game stats',
+            style: AppTextStyles.titleLarge.copyWith(color: Colors.white),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _StatCard(label: 'Games', value: '$totalGames', icon: Icons.sports_esports),
+              _StatCard(label: 'Quick games', value: '$quickGames', icon: Icons.flash_on, color: Colors.orangeAccent),
+              _StatCard(label: 'Matches', value: '$matchesPlayed', icon: Icons.scoreboard, color: Colors.lightBlueAccent),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _StatCard(label: 'Legs played', value: '$legsPlayed', icon: Icons.timeline, color: Colors.greenAccent),
+              _StatCard(label: 'Players', value: '${playersResults.length}', icon: Icons.group, color: Colors.purpleAccent),
+              _StatCard(label: 'Formats', value: gameResult['game_type']?.toString() ?? '—', icon: Icons.sports_handball, color: Colors.cyanAccent),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          if (playersResults.isNotEmpty)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Player breakdown',
+                  style: AppTextStyles.titleLarge.copyWith(color: Colors.white),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ...playersResults.map((p) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: _ComprehensiveStatsCard(playerData: p),
+                    )),
+              ],
+            ),
+        ],
       ),
     );
   }
@@ -326,7 +417,7 @@ class _ComprehensiveStatsCard extends StatelessWidget {
               _StatCard(
                 label: 'Avg/Dart',
                 value: averagePerDart,
-                icon: Icons.target,
+                icon: Icons.track_changes,
               ),
               _StatCard(
                 label: 'Avg/Round',

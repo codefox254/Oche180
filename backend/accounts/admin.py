@@ -9,6 +9,8 @@ class UserProfileInline(admin.StackedInline):
     can_delete = False
     verbose_name_plural = "Profile"
     fk_name = "user"
+    extra = 0  # Do not render blank inline on add; profile is created via signal
+    max_num = 1
 
 
 @admin.register(User)

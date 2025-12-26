@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:io';
 
 import '../../../core/constants/app_design.dart';
@@ -126,6 +127,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = ref.watch(authProvider);
+    if (!auth.isAuthenticated || auth.token == null) {
+      // Redirect guests to login/register
+      Future.microtask(() {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Login to edit your profile')),
+          );
+          Navigator.pop(context);
+          context.push('/auth/login');
+        }
+      });
+      return const SizedBox.shrink();
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Profile'),

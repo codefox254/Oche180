@@ -19,8 +19,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _stats;
-  List<dynamic> _recentGames = [];
-  List<dynamic> _personalBests = [];
+  final List<dynamic> _personalBests = [];
 
   @override
   void initState() {
@@ -45,11 +44,10 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
       }
 
       final stats = await _service.getUserStatistics(authState.token!);
-      final games = await _service.getRecentGames(authState.token!, limit: 10);
       
       setState(() {
         _stats = stats;
-        _recentGames = games;
+
         _loading = false;
       });
     } catch (e) {
@@ -70,9 +68,6 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
       }
     });
 
-    final authState = ref.watch(authProvider);
-    final profile = authState.user?.profile;
-    
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -109,19 +104,25 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                         child: CircularProgressIndicator(color: AppColors.primary),
                       )
                     : _error != null
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.error_outline, color: AppColors.error, size: 48),
-                                const SizedBox(height: AppSpacing.md),
-                                Text(_error!, style: AppTextStyles.bodyLarge, textAlign: TextAlign.center),
-                                const SizedBox(height: AppSpacing.lg),
-                                ElevatedButton(
-                                  onPressed: _loadStats,
-                                  child: const Text('Retry'),
+                        ? SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(AppSpacing.lg),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+                                    const SizedBox(height: AppSpacing.md),
+                                    Text(_error!, style: AppTextStyles.bodyLarge, textAlign: TextAlign.center),
+                                    const SizedBox(height: AppSpacing.lg),
+                                    ElevatedButton(
+                                      onPressed: _loadStats,
+                                      child: const Text('Retry'),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           )
                         : RefreshIndicator(
@@ -154,6 +155,9 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
   }
 
   Widget _buildOverviewSection() {
+    final quickGames = _stats?['quick_games'] ?? _stats?['quick_play_games'] ?? 0;
+    final totalGames = (_stats?['total_games'] ?? 0) + (quickGames is num ? quickGames : 0);
+
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,14 +169,14 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
             children: [
               _StatItem(
                 label: 'Games',
-                value: '${_stats?['total_games'] ?? 0}',
+                value: '$totalGames',
                 icon: Icons.sports_esports,
               ),
               _StatItem(
-                label: 'Wins',
-                value: '${_stats?['total_wins'] ?? 0}',
-                icon: Icons.emoji_events,
-                color: AppColors.success,
+                label: 'Quick games',
+                value: '$quickGames',
+                icon: Icons.flash_on,
+                color: AppColors.warning,
               ),
               _StatItem(
                 label: 'Win %',

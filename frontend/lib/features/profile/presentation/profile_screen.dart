@@ -535,6 +535,16 @@ class _SettingsSection extends ConsumerWidget {
           icon: Icons.edit,
           title: 'Edit Profile',
           onTap: () {
+            final auth = ref.read(authProvider);
+            if (!auth.isAuthenticated || auth.token == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please login to edit your profile'),
+                ),
+              );
+              context.push('/auth/login');
+              return;
+            }
             Navigator.push(
               context,
               MaterialPageRoute(

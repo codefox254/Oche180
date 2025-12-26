@@ -9,6 +9,20 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/utils/auth_utils.dart';
 import '../../../core/widgets/dartboard_icon.dart';
+import '../../../core/services/statistics_service.dart';
+
+// Fetches live user statistics (including quick games) for the home header.
+final homeStatsProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+  final auth = ref.watch(authProvider);
+  if (!auth.isAuthenticated || auth.token == null) return null;
+
+  final service = StatisticsService();
+  try {
+    return await service.getUserStatistics(auth.token!);
+  } catch (_) {
+    return null;
+  }
+});
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -117,9 +131,17 @@ class _StatsOverview extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final profile = user?.profile;
-    
-    final totalGames = profile?.totalGamesPlayed ?? 0;
-    final totalXP = profile?.totalXp ?? 0;
+    final statsAsync = ref.watch(homeStatsProvider);
+
+    // Prefer live stats from the stats API; fall back to profile fields.
+    final stats = statsAsync.value;
+    final quickGames = stats?['quick_games'] ?? stats?['quick_play_games'] ?? 0;
+    final totalGames = (stats?['total_games'] ?? profile?.totalGamesPlayed ?? 0) + (quickGames is num ? quickGames : 0);
+    final totalXP = stats?['total_xp'] ?? profile?.totalXp ?? 0;
+    final level = stats?['level'] ?? profile?.level ?? 1;
+
+    final loading = statsAsync.isLoading && stats == null;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -158,14 +180,17 @@ class _StatsOverview extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _StatItem(label: 'Games', value: '$totalGames', icon: Icons.sports_esports),
-              _StatItem(label: 'XP', value: '$totalXP', icon: Icons.stars),
-              _StatItem(label: 'Level', value: '${profile?.level ?? 1}', icon: Icons.trending_up),
-            ],
-          ),
+          if (loading)
+            const Center(child: CircularProgressIndicator(color: AppColors.bgDark))
+          else
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _StatItem(label: 'Games', value: '$totalGames', icon: Icons.sports_esports),
+                _StatItem(label: 'XP', value: '$totalXP', icon: Icons.stars),
+                _StatItem(label: 'Level', value: '$level', icon: Icons.trending_up),
+              ],
+            ),
         ],
       ),
     );

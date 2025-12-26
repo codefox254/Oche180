@@ -10,18 +10,31 @@ class TournamentApiService {
         ? Uri.parse('$baseUrl/api/tournaments/?status=$status')
         : Uri.parse('$baseUrl/api/tournaments/');
 
-    final response = await http.get(
-      uri,
-      headers: {
+    try {
+      final headers = <String, String>{
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+      };
+      
+      // Only add authorization if token is provided
+      if (token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      
+      final response = await http.get(uri, headers: headers);
 
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to load tournaments: ${response.body}');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data is List ? data : [];
+      } else if (response.statusCode == 401 || response.statusCode == 404) {
+        // Return empty list for unauthorized or not found instead of throwing
+        return [];
+      } else {
+        // For other errors, return empty list gracefully
+        return [];
+      }
+    } catch (e) {
+      // Return empty list on any error
+      return [];
     }
   }
 

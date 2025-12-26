@@ -51,10 +51,22 @@ class _GameScoringScreenState extends State<GameScoringScreen> with SingleTicker
   late Map<String, int> setsWon;
   late Map<String, int> legsWon;
   late int? originalBullWinner;
+  late final int startingScore;
+
+  int _getStartingScore() {
+    final mode = widget.gameMode.toLowerCase();
+    if (mode.contains('301')) return 301;
+    if (mode.contains('701')) return 701;
+    if (mode.contains('1001')) return 1001;
+    return 501; // Default to 501
+  }
 
   @override
   void initState() {
     super.initState();
+    // Get starting score based on game mode
+    startingScore = _getStartingScore();
+    
     // Initialize players from widget or use defaults
     if (widget.players != null && widget.players!.isNotEmpty) {
       players = widget.players!;
@@ -62,8 +74,8 @@ class _GameScoringScreenState extends State<GameScoringScreen> with SingleTicker
       players = ['Player 1', 'Player 2'];
     }
     
-    // Initialize scores map
-    scores = {for (var p in players) p: 501};
+    // Initialize scores map with correct starting score
+    scores = {for (var p in players) p: startingScore};
         // Initialize match state
         currentSet = 1;
         currentLeg = 1;
@@ -217,8 +229,8 @@ class _GameScoringScreenState extends State<GameScoringScreen> with SingleTicker
           currentLeg = 1;
           // Reset leg wins for new set
           legsWon = {for (var p in players) p: 0};
-          // Reset scores
-          scores.updateAll((key, value) => 501);
+          // Reset scores with correct starting score
+          scores.updateAll((key, value) => startingScore);
           history.clear();
           pendingScore = 0;
           // Bull winner starts new set
@@ -246,8 +258,8 @@ class _GameScoringScreenState extends State<GameScoringScreen> with SingleTicker
       setState(() {
         currentLeg++;
       
-        // Reset scores for new leg
-        scores.updateAll((key, value) => 501);
+        // Reset scores for new leg with correct starting score
+        scores.updateAll((key, value) => startingScore);
         history.clear();
         pendingScore = 0;
       
@@ -281,48 +293,355 @@ class _GameScoringScreenState extends State<GameScoringScreen> with SingleTicker
     }
   
     void _showMatchWinnerDialog(String winner) {
+      // Calculate comprehensive statistics
+      final stats = _calculatePlayerStatistics();
+      
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => AlertDialog(
+        builder: (context) => Dialog(
           backgroundColor: AppColors.bgCard,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppBorderRadius.xl),
           ),
-          title: const Text('🎯 Match Over!', style: TextStyle(color: AppColors.primary)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '$winner wins the match!',
-                style: AppTextStyles.headlineMedium.copyWith(color: AppColors.textPrimary),
-              ),
-              if (widget.matchFormat == 'sets') ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Sets: ${setsWon[winner]} - ${setsWon.values.reduce((a, b) => a > b ? b : a)}',
-                  style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSecondary),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColors.primary, AppColors.secondary],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(AppBorderRadius.xl),
+                      topRight: Radius.circular(AppBorderRadius.xl),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.emoji_events, size: 48, color: Colors.white),
+                      const SizedBox(height: 8),
+                      Text(
+                        'MATCH COMPLETE',
+                        style: AppTextStyles.headlineMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$winner WINS!',
+                        style: AppTextStyles.headlineMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
                 ),
-              ] else if (widget.matchFormat == 'best_of') ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Legs: ${legsWon[winner]} - ${legsWon.values.reduce((a, b) => a > b ? b : a)}',
-                  style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSecondary),
+                
+                // Statistics
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                      children: [
+                        // Match Score
+                        _buildMatchScoreCard(),
+                        const SizedBox(height: AppSpacing.lg),
+                        
+                        // Player Statistics Table
+                        _buildStatisticsTable(stats),
+                        const SizedBox(height: AppSpacing.lg),
+                        
+                        // Performance Indicators
+                        _buildPerformanceIndicators(stats),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Actions
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            context.pop();
+                            context.pop();
+                          },
+                          icon: const Icon(Icons.home),
+                          label: const Text('Home'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            context.pop();
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('New Game'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                context.pop();
-                context.pop(); // Go back to setup/modes
-              },
-              child: const Text('New Game', style: TextStyle(color: AppColors.primary)),
             ),
-          ],
+          ),
         ),
+      );
+    }
+    
+    Widget _buildMatchScoreCard() {
+      return Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.bgLight.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(AppBorderRadius.md),
+          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: players.map((p) {
+            return Column(
+              children: [
+                Text(p, style: AppTextStyles.titleMedium),
+                const SizedBox(height: 4),
+                if (widget.matchFormat == 'sets')
+                  Text(
+                    '${setsWon[p] ?? 0}',
+                    style: AppTextStyles.displayMedium.copyWith(
+                      color: setsWon[p] == setsWon.values.reduce((a, b) => a > b ? a : b) ? AppColors.primary : AppColors.textSecondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                else if (widget.matchFormat == 'best_of')
+                  Text(
+                    '${legsWon[p] ?? 0}',
+                    style: AppTextStyles.displayMedium.copyWith(
+                      color: legsWon[p] == legsWon.values.reduce((a, b) => a > b ? a : b) ? AppColors.primary : AppColors.textSecondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                else
+                  Icon(
+                    scores[p] == 0 ? Icons.emoji_events : Icons.close,
+                    size: 32,
+                    color: scores[p] == 0 ? AppColors.primary : AppColors.error,
+                  ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.matchFormat == 'sets' ? 'Sets' : widget.matchFormat == 'best_of' ? 'Legs' : 'Result',
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      );
+    }
+
+    Map<String, Map<String, dynamic>> _calculatePlayerStatistics() {
+      final Map<String, Map<String, dynamic>> stats = {};
+      
+      for (final player in players) {
+        final playerThrows = history.where((h) => h.player == player).toList();
+        final totalDarts = playerThrows.length;
+        final totalScore = playerThrows.fold<int>(0, (sum, h) => sum + h.scored);
+        final validThrows = playerThrows.where((h) => !h.isBust).toList();
+        
+        // Calculate averages
+        final average = totalDarts > 0 ? (totalScore / totalDarts).toStringAsFixed(2) : '0.00';
+        final first9Avg = totalDarts >= 9 
+            ? (playerThrows.take(9).fold<int>(0, (sum, h) => sum + h.scored) / 9).toStringAsFixed(2)
+            : '0.00';
+        
+        // Count high scores
+        final scores100Plus = playerThrows.where((h) => h.scored >= 100 && h.scored < 140).length;
+        final scores140Plus = playerThrows.where((h) => h.scored >= 140 && h.scored < 180).length;
+        final scores180 = playerThrows.where((h) => h.scored == 180).length;
+        final scores60Plus = playerThrows.where((h) => h.scored >= 60 && h.scored < 100).length;
+        
+        // Calculate highest score
+        final highestScore = playerThrows.isEmpty ? 0 : playerThrows.map((h) => h.scored).reduce((a, b) => a > b ? a : b);
+        
+        // Checkout percentage (simplified)
+        final checkoutAttempts = playerThrows.where((h) => h.remaining < startingScore && h.remaining <= 170).length;
+        final checkoutsHit = playerThrows.where((h) => h.remaining == 0).length;
+        final checkoutPct = checkoutAttempts > 0 ? ((checkoutsHit / checkoutAttempts) * 100).toStringAsFixed(1) : '0.0';
+        
+        stats[player] = {
+          'totalDarts': totalDarts,
+          'totalScore': totalScore,
+          'average': average,
+          'first9Avg': first9Avg,
+          '180s': scores180,
+          '140+': scores140Plus,
+          '100+': scores100Plus,
+          '60+': scores60Plus,
+          'highestScore': highestScore,
+          'checkoutPct': checkoutPct,
+          'checkouts': checkoutsHit,
+        };
+      }
+      
+      return stats;
+    }
+
+    Widget _buildStatisticsTable(Map<String, Map<String, dynamic>> stats) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Match Statistics',
+            style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppBorderRadius.md),
+              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+            ),
+            child: Table(
+              border: TableBorder.symmetric(
+                inside: BorderSide(color: AppColors.bgLight.withOpacity(0.3)),
+              ),
+              columnWidths: const {
+                0: FlexColumnWidth(2),
+                1: FlexColumnWidth(1),
+                2: FlexColumnWidth(1),
+              },
+              children: [
+                // Header
+                TableRow(
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                  ),
+                  children: [
+                    _buildTableHeader('Statistic'),
+                    ...players.map((p) => _buildTableHeader(p.length > 10 ? p.substring(0, 10) : p)),
+                  ],
+                ),
+                // Average
+                _buildTableRow('Average', players.map((p) => stats[p]!['average'].toString()).toList()),
+                _buildTableRow('First 9 Avg', players.map((p) => stats[p]!['first9Avg'].toString()).toList()),
+                _buildTableRow('Highest Score', players.map((p) => stats[p]!['highestScore'].toString()).toList()),
+                _buildTableRow('180s', players.map((p) => stats[p]!['180s'].toString()).toList(), highlight: true),
+                _buildTableRow('140+', players.map((p) => stats[p]!['140+'].toString()).toList()),
+                _buildTableRow('100+', players.map((p) => stats[p]!['100+'].toString()).toList()),
+                _buildTableRow('60+', players.map((p) => stats[p]!['60+'].toString()).toList()),
+                _buildTableRow('Checkouts', players.map((p) => stats[p]!['checkouts'].toString()).toList()),
+                _buildTableRow('Checkout %', players.map((p) => '${stats[p]!['checkoutPct']}%').toList()),
+                _buildTableRow('Total Darts', players.map((p) => stats[p]!['totalDarts'].toString()).toList()),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    TableRow _buildTableRow(String label, List<String> values, {bool highlight = false}) {
+      return TableRow(
+        decoration: highlight ? BoxDecoration(color: AppColors.secondary.withOpacity(0.05)) : null,
+        children: [
+          _buildTableCell(label, isLabel: true),
+          ...values.map((v) => _buildTableCell(v)),
+        ],
+      );
+    }
+
+    Widget _buildTableHeader(String text) {
+      return Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Text(
+          text,
+          style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    Widget _buildTableCell(String text, {bool isLabel = false}) {
+      return Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Text(
+          text,
+          style: isLabel 
+              ? AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w500)
+              : AppTextStyles.bodyMedium,
+          textAlign: isLabel ? TextAlign.left : TextAlign.center,
+        ),
+      );
+    }
+
+    Widget _buildPerformanceIndicators(Map<String, Map<String, dynamic>> stats) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Performance',
+            style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ...players.map((player) {
+            final avg = double.parse(stats[player]!['average']);
+            final color = avg >= 80 ? Colors.green : avg >= 60 ? Colors.orange : Colors.red;
+            final rating = avg >= 100 ? 'Elite' : avg >= 80 ? 'Pro' : avg >= 60 ? 'Advanced' : avg >= 40 ? 'Intermediate' : 'Beginner';
+            
+            return Container(
+              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                border: Border.all(color: color.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.person, color: color, size: 20),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(player, style: AppTextStyles.titleMedium),
+                        Text(
+                          '$rating • ${stats[player]!['average']} avg',
+                          style: AppTextStyles.bodySmall.copyWith(color: color),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(AppBorderRadius.sm),
+                    ),
+                    child: Text(
+                      stats[player]!['average'].toString(),
+                      style: AppTextStyles.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
       );
     }
 
@@ -470,13 +789,23 @@ class _GameScoringScreenState extends State<GameScoringScreen> with SingleTicker
             onPressed: () {},
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Keypad'),
-            Tab(text: 'Quick'),
-            Tab(text: 'Dartboard'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            height: 44,
+            child: TabBar(
+              controller: _tabController,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicatorWeight: 2,
+              labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
+              tabs: const [
+                Tab(text: 'Keypad', height: 40),
+                Tab(text: 'Quick', height: 40),
+                Tab(text: 'Dartboard', height: 40),
+              ],
+            ),
+          ),
         ),
       ),
       body: Column(
@@ -487,6 +816,7 @@ class _GameScoringScreenState extends State<GameScoringScreen> with SingleTicker
               players: players,
               scores: scores,
               currentPlayerIndex: currentPlayerIndex,
+              startingScore: startingScore,
             ),
           ),
           Expanded(
@@ -532,11 +862,12 @@ class _GameScoringScreenState extends State<GameScoringScreen> with SingleTicker
 }
 
 class _ScoreHeader extends StatelessWidget {
-  const _ScoreHeader({required this.players, required this.scores, required this.currentPlayerIndex});
+  const _ScoreHeader({required this.players, required this.scores, required this.currentPlayerIndex, required this.startingScore});
 
   final List<String> players;
   final Map<String, int> scores;
   final int currentPlayerIndex;
+  final int startingScore;
 
   String? _getFinishRecommendation(int score) {
     // Common finish combinations
@@ -622,7 +953,7 @@ class _ScoreHeader extends StatelessWidget {
     return Row(
       children: players.map((p) {
         final isActive = players.indexOf(p) == currentPlayerIndex;
-        final playerScore = scores[p] ?? 501;
+        final playerScore = scores[p] ?? startingScore;
         final finishTip = playerScore <= 170 ? _getFinishRecommendation(playerScore) : null;
         
         return Expanded(
