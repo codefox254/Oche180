@@ -128,8 +128,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                             prefixIcon: Icon(Icons.email_outlined),
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty) return 'Enter your email';
-                            if (!value.contains('@')) return 'Enter a valid email';
+                            final v = value?.trim() ?? '';
+                            if (v.isEmpty) return 'Enter your email';
+                            final emailOk = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v);
+                            if (!emailOk) return 'Enter a valid email';
                             return null;
                           },
                         ),
@@ -141,12 +143,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                           controller: _passwordController,
                           obscureText: true,
                           decoration: const InputDecoration(
-                            hintText: 'At least 6 characters',
+                            hintText: '8+ chars with letters & numbers',
                             prefixIcon: Icon(Icons.lock_outline),
                           ),
                           validator: (value) {
-                            if (value == null || value.length < 6) {
-                              return 'Use at least 6 characters';
+                            final v = value ?? '';
+                            if (v.length < 8) return 'Use at least 8 characters';
+                            final hasLetter = RegExp(r'[A-Za-z]').hasMatch(v);
+                            final hasNumber = RegExp(r'\d').hasMatch(v);
+                            if (!hasLetter || !hasNumber) {
+                              return 'Include letters and numbers';
                             }
                             return null;
                           },

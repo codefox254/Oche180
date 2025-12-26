@@ -4,15 +4,34 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_design.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/theme_provider.dart';
+import '../../../core/services/statistics_service.dart';
 import 'edit_profile_screen.dart';
+
+final recentGamesProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
+  final auth = ref.watch(authProvider);
+  if (!auth.isAuthenticated || auth.token == null) return [];
+  return StatisticsService().getRecentGames(auth.token!, limit: 5);
+});
+
+class NotificationAllowedNotifier extends Notifier<bool> {
+  @override
+  bool build() => true;
+
+  void setAllowed(bool value) {
+    state = value;
+  }
+}
+
+final notificationAllowedProvider = NotifierProvider<NotificationAllowedNotifier, bool>(() {
+  return NotificationAllowedNotifier();
+});
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authProvider);
-    final user = authState.user;
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -381,40 +400,122 @@ class _AchievementsSection extends StatelessWidget {
   }
 }
 
-class _RecentMatches extends StatelessWidget {
+class _RecentMatches extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(AppBorderRadius.lg),
-        border: Border.all(color: AppColors.bgLight.withOpacity(0.3)),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recentGames = ref.watch(recentGamesProvider);
+    return recentGames.when(
+      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      error: (err, _) => Container(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(AppBorderRadius.lg),
+          border: Border.all(color: AppColors.bgLight.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.error_outline, color: AppColors.error, size: 32),
+            const SizedBox(height: AppSpacing.sm),
+            Text('Could not load recent games', style: AppTextStyles.bodyLarge),
+            const SizedBox(height: AppSpacing.xs),
+            Text('$err', style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary)),
+          ],
+        ),
       ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.sports_esports,
-            color: AppColors.textTertiary,
-            size: 48,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'No matches played yet',
-            style: AppTextStyles.bodyLarge.copyWith(
-              color: AppColors.textSecondary,
+      data: (games) {
+        if (games.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: AppColors.bgCard.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(AppBorderRadius.lg),
+              border: Border.all(color: AppColors.bgLight.withOpacity(0.3)),
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Start playing to see your match history here',
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textTertiary,
+            child: Column(
+              children: [
+                Icon(
+                  Icons.sports_esports,
+                  color: AppColors.textTertiary,
+                  size: 48,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'No matches played yet',
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Start playing to see your match history here',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-            textAlign: TextAlign.center,
+          );
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard.withOpacity(0.6),
+            borderRadius: BorderRadius.circular(AppBorderRadius.lg),
+            border: Border.all(color: AppColors.bgLight.withOpacity(0.3)),
           ),
-        ],
-      ),
+          child: Column(
+            children: games.map((g) {
+              final result = g['result'] ?? 'N/A';
+              final avg = g['average_per_dart'];
+              final high = g['highest_score'];
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: result == 'W' ? AppColors.success : AppColors.error,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          result,
+                          style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(g['game_type'] ?? 'Game', style: AppTextStyles.bodyLarge),
+                          Text(
+                            g['created_at'] ?? '',
+                            style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (avg != null)
+                      Text('Avg ${avg.toString()}', style: AppTextStyles.labelSmall),
+                    if (high != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: AppSpacing.sm),
+                        child: Text('High $high', style: AppTextStyles.labelSmall),
+                      ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 }
@@ -425,6 +526,8 @@ class _SettingsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final notificationsAllowed = ref.watch(notificationAllowedProvider);
     
     return Column(
       children: [
@@ -440,15 +543,36 @@ class _SettingsSection extends ConsumerWidget {
             );
           },
         ),
-        _SettingItem(
-          icon: Icons.palette,
-          title: 'Theme Settings',
-          onTap: () {},
+        Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard.withOpacity(0.6),
+            borderRadius: BorderRadius.circular(AppBorderRadius.md),
+            border: Border.all(color: AppColors.bgLight.withOpacity(0.3)),
+          ),
+          child: SwitchListTile.adaptive(
+            value: themeMode == ThemeMode.dark,
+            activeColor: AppColors.primary,
+            title: Text('Dark Mode', style: AppTextStyles.bodyLarge),
+            onChanged: (_) => ref.read(themeModeProvider.notifier).toggleTheme(),
+            secondary: const Icon(Icons.dark_mode, color: AppColors.primary),
+          ),
         ),
-        _SettingItem(
-          icon: Icons.notifications,
-          title: 'Notifications',
-          onTap: () {},
+        Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard.withOpacity(0.6),
+            borderRadius: BorderRadius.circular(AppBorderRadius.md),
+            border: Border.all(color: AppColors.bgLight.withOpacity(0.3)),
+          ),
+          child: SwitchListTile.adaptive(
+            value: notificationsAllowed,
+            activeColor: AppColors.primary,
+            title: Text('Notifications', style: AppTextStyles.bodyLarge),
+            subtitle: Text('Allow alerts for matches and stats', style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary)),
+            onChanged: (value) => ref.read(notificationAllowedProvider.notifier).setAllowed(value),
+            secondary: const Icon(Icons.notifications, color: AppColors.primary),
+          ),
         ),
         if (authState.isAuthenticated)
           _SettingItem(

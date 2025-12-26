@@ -385,6 +385,10 @@ class _GameModes extends StatelessWidget {
           children: [
             Text('Game Modes', style: AppTextStyles.headlineMedium),
             TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                textStyle: AppTextStyles.labelLarge,
+              ),
               onPressed: () => context.push('/game-modes'),
               child: const Text('View All'),
             ),

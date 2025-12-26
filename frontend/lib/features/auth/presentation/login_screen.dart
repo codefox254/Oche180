@@ -123,12 +123,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           controller: _passwordController,
                           obscureText: true,
                           decoration: const InputDecoration(
-                            hintText: '••••••••',
+                            hintText: '8+ chars with letters & numbers',
                             prefixIcon: Icon(Icons.lock_outline),
                           ),
                           validator: (value) {
-                            if (value == null || value.length < 6) {
-                              return 'Use at least 6 characters';
+                            final v = value ?? '';
+                            if (v.length < 8) return 'Use at least 8 characters';
+                            final hasLetter = RegExp(r'[A-Za-z]').hasMatch(v);
+                            final hasNumber = RegExp(r'\d').hasMatch(v);
+                            if (!hasLetter || !hasNumber) {
+                                return 'Include letters and numbers';
                             }
                             return null;
                           },

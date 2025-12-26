@@ -62,6 +62,14 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(authProvider, (prev, next) {
+      final prevToken = prev?.token;
+      final nextToken = next.token;
+      if (next.isAuthenticated && nextToken != null && prevToken != nextToken) {
+        _loadStats();
+      }
+    });
+
     final authState = ref.watch(authProvider);
     final profile = authState.user?.profile;
     
@@ -116,22 +124,26 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                               ],
                             ),
                           )
-                        : ListView(
-                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                            children: [
-                              _buildOverviewSection(),
-                              const SizedBox(height: AppSpacing.lg),
-                              _buildAveragesSection(),
-                              const SizedBox(height: AppSpacing.lg),
-                              _buildHighlightsSection(),
-                              const SizedBox(height: AppSpacing.lg),
-                              _buildModeBreakdownSection(),
-                              const SizedBox(height: AppSpacing.lg),
-                              _buildRecentFormSection(),
-                              const SizedBox(height: AppSpacing.lg),
-                              _buildPersonalBestsSection(),
-                              const SizedBox(height: AppSpacing.xl),
-                            ],
+                        : RefreshIndicator(
+                            color: AppColors.primary,
+                            onRefresh: _loadStats,
+                            child: ListView(
+                              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                              children: [
+                                _buildOverviewSection(),
+                                const SizedBox(height: AppSpacing.lg),
+                                _buildAveragesSection(),
+                                const SizedBox(height: AppSpacing.lg),
+                                _buildHighlightsSection(),
+                                const SizedBox(height: AppSpacing.lg),
+                                _buildModeBreakdownSection(),
+                                const SizedBox(height: AppSpacing.lg),
+                                _buildRecentFormSection(),
+                                const SizedBox(height: AppSpacing.lg),
+                                _buildPersonalBestsSection(),
+                                const SizedBox(height: AppSpacing.xl),
+                              ],
+                            ),
                           ),
               ),
             ],

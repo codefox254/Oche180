@@ -11,7 +11,7 @@ class StatisticsService {
       Uri.parse('$baseUrl/api/stats/summary/'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
+        'Authorization': 'Token $token',
       },
     );
 
@@ -27,7 +27,7 @@ class StatisticsService {
       Uri.parse('$baseUrl/api/games/recent/?limit=$limit'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
+        'Authorization': 'Token $token',
       },
     );
 
@@ -46,7 +46,7 @@ class StatisticsService {
       Uri.parse('$baseUrl/api/stats/game-mode/$gameMode/'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
+        'Authorization': 'Token $token',
       },
     );
 
@@ -62,7 +62,7 @@ class StatisticsService {
       Uri.parse('$baseUrl/api/stats/achievements/'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
+        'Authorization': 'Token $token',
       },
     );
 
@@ -78,7 +78,7 @@ class StatisticsService {
       Uri.parse('$baseUrl/api/stats/progress/'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
+        'Authorization': 'Token $token',
       },
     );
 

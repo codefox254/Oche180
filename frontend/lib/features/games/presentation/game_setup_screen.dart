@@ -2,22 +2,25 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_design.dart';
+import '../../../core/providers/auth_provider.dart';
 
-class GameSetupScreen extends StatefulWidget {
+class GameSetupScreen extends ConsumerStatefulWidget {
   final String gameMode;
 
   const GameSetupScreen({super.key, required this.gameMode});
 
   @override
-  State<GameSetupScreen> createState() => _GameSetupScreenState();
+  ConsumerState<GameSetupScreen> createState() => _GameSetupScreenState();
 }
 
-class _GameSetupScreenState extends State<GameSetupScreen> {
+class _GameSetupScreenState extends ConsumerState<GameSetupScreen> {
   bool _isTeamMode = false;
   int _playerCount = 1; // For singles: 1-6 players
   int _teamCount = 2; // For teams: 2-4 teams
+  bool _prefilledUser = false;
   
   // Match format options
   String _matchFormat = 'single'; // 'single', 'best_of', 'sets'
@@ -28,6 +31,24 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
   final List<TextEditingController> _playerControllers = [
     TextEditingController(text: 'Player 1'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prefillLoggedInUser();
+    });
+  }
+
+  void _prefillLoggedInUser() {
+    if (_prefilledUser) return;
+    final authState = ref.read(authProvider);
+    final displayName = authState.user?.displayName ?? authState.user?.publicUsername ?? authState.user?.email.split('@').first;
+    if (displayName != null && displayName.isNotEmpty) {
+      _playerControllers.first.text = displayName;
+      _prefilledUser = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -98,6 +119,7 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _prefillLoggedInUser();
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -436,11 +458,22 @@ class _GameSetupScreenState extends State<GameSetupScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                      // Get player names
+                      // Get player names and ensure the logged-in user is included
+                      final totalSlots = _isTeamMode ? _teamCount * 2 : _playerCount;
                       final playerNames = _playerControllers
-                          .take(_isTeamMode ? _teamCount * 2 : _playerCount)
-                          .map((c) => c.text)
+                          .take(totalSlots)
+                          .map((c) => c.text.trim())
+                          .where((name) => name.isNotEmpty)
                           .toList();
+
+                      final authState = ref.read(authProvider);
+                      final currentName = authState.user?.displayName ?? authState.user?.publicUsername ?? authState.user?.email.split('@').first;
+                      if (currentName != null && currentName.isNotEmpty) {
+                        final hasCurrent = playerNames.any((n) => n.toLowerCase() == currentName.toLowerCase());
+                        if (!hasCurrent) {
+                          playerNames.insert(0, currentName);
+                        }
+                      }
                       
                       // Navigate to bull-to-start screen with players and match config
                       context.push(
