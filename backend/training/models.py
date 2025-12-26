@@ -24,6 +24,7 @@ class TrainingSession(models.Model):
     final_score = models.IntegerField(null=True, blank=True)
     success_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     xp_earned = models.IntegerField(default=0)  # XP earned in this session
+    terminated = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

@@ -61,6 +61,15 @@ class TrainingApi {
     }
     throw Exception('Failed to start session: ${res.statusCode}');
   }
+  
+  Future<Map<String, dynamic>> terminateSession(int sessionId) async {
+    final uri = Uri.parse('$baseUrl/training/sessions/$sessionId/terminate/');
+    final response = await http.post(uri, headers: _headers);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to terminate session: ${response.body}');
+  }
 
   Future<void> recordThrow({required int sessionId, required int throwNumber, required int target, required int score, required bool hit}) async {
     final res = await http.post(

@@ -74,6 +74,26 @@ class TournamentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Create tournament with current user as organizer"""
         serializer.save(organizer=self.request.user)
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def pause(self, request, pk=None):
+        """Pause a tournament (organizer or staff)"""
+        tournament = self.get_object()
+        if tournament.organizer != request.user and not request.user.is_staff:
+            return Response({"error": "Only organizer can pause"}, status=status.HTTP_403_FORBIDDEN)
+        tournament.status = Tournament.Status.PAUSED
+        tournament.save()
+        return Response({"message": "Tournament paused"})
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def resume(self, request, pk=None):
+        """Resume a paused tournament"""
+        tournament = self.get_object()
+        if tournament.organizer != request.user and not request.user.is_staff:
+            return Response({"error": "Only organizer can resume"}, status=status.HTTP_403_FORBIDDEN)
+        tournament.status = Tournament.Status.IN_PROGRESS
+        tournament.save()
+        return Response({"message": "Tournament resumed"})
     
     @action(detail=True, methods=["post"])
     def register(self, request, pk=None):
@@ -235,6 +255,92 @@ class TournamentViewSet(viewsets.ModelViewSet):
         entry.save()
         
         return Response(TournamentEntrySerializer(entry).data)
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def reschedule_match(self, request, pk=None):
+        """Reschedule a match (organizer only)"""
+        tournament = self.get_object()
+        if tournament.organizer != request.user and not request.user.is_staff:
+            return Response({"error": "Only organizer can reschedule"}, status=status.HTTP_403_FORBIDDEN)
+
+        match_id = request.data.get("match_id")
+        new_time = request.data.get("scheduled_time")
+        if not match_id or not new_time:
+            return Response({"error": "match_id and scheduled_time required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        match = get_object_or_404(TournamentMatch, id=match_id, tournament=tournament)
+        try:
+            from django.utils.dateparse import parse_datetime
+            dt = parse_datetime(new_time)
+            if dt is None:
+                raise ValueError("Invalid datetime format")
+            match.scheduled_time = dt
+            match.save()
+            return Response({"message": "Match rescheduled", "match_id": match.id, "scheduled_time": match.scheduled_time})
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def override_result(self, request, pk=None):
+        """Override a match result (organizer only)"""
+        tournament = self.get_object()
+        if tournament.organizer != request.user and not request.user.is_staff:
+            return Response({"error": "Only organizer can override results"}, status=status.HTTP_403_FORBIDDEN)
+
+        match_id = request.data.get("match_id")
+        p1 = request.data.get("player1_score")
+        p2 = request.data.get("player2_score")
+        if match_id is None or p1 is None or p2 is None:
+            return Response({"error": "match_id, player1_score, player2_score required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        match = get_object_or_404(TournamentMatch, id=match_id, tournament=tournament)
+        match.player1_score = int(p1)
+        match.player2_score = int(p2)
+        if match.player1_score > match.player2_score:
+            match.winner_entry = match.player1_entry
+        elif match.player2_score > match.player1_score:
+            match.winner_entry = match.player2_entry
+        else:
+            return Response({"error": "Scores cannot be tied"}, status=status.HTTP_400_BAD_REQUEST)
+        match.status = TournamentMatch.Status.COMPLETED
+        match.completed_at = timezone.now()
+        match.save()
+
+        # live event
+        try:
+            from .models import MatchEvent
+            MatchEvent.objects.create(
+                match=match,
+                event_type=MatchEvent.Type.RESULT_OVERRIDE,
+                payload={"p1": match.player1_score, "p2": match.player2_score, "winner": match.winner_entry.entry_id if match.winner_entry else None}
+            )
+        except Exception:
+            pass
+
+        # advance and update standings
+        if match.winner_entry:
+            BracketGenerator.advance_winner(match, match.winner_entry)
+        if tournament.tournament_format in [Tournament.Format.SWISS, Tournament.Format.ROUND_ROBIN]:
+            BracketGenerator.update_swiss_standings(tournament)
+
+        return Response(TournamentMatchSerializer(match).data)
+
+    @action(detail=True, methods=["get"], permission_classes=[permissions.AllowAny])
+    def live_matches(self, request, pk=None):
+        """List in-progress matches for live scores"""
+        tournament = self.get_object()
+        qs = TournamentMatch.objects.filter(tournament=tournament, status=TournamentMatch.Status.IN_PROGRESS)
+        return Response(TournamentMatchSerializer(qs, many=True).data)
+
+    @action(detail=True, methods=["get"], permission_classes=[permissions.AllowAny])
+    def match_events(self, request, pk=None):
+        """Get event feed for a match"""
+        from .models import MatchEvent
+        match_id = request.query_params.get("match_id")
+        match = get_object_or_404(TournamentMatch, id=match_id, tournament=self.get_object())
+        events = match.events.all()
+        data = [{"type": e.event_type, "payload": e.payload, "at": e.created_at.isoformat()} for e in events]
+        return Response(data)
     
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
     def start_tournament(self, request, pk=None):
@@ -294,7 +400,7 @@ class TournamentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def featured(self, request):
         """Get featured tournaments"""
-        tournaments = Tournament.objects.filter(is_featured=True, status__in=[
+        tournaments = self.get_queryset().filter(is_featured=True, status__in=[
             Tournament.Status.REGISTRATION_OPEN,
             Tournament.Status.REGISTRATION_CLOSED,
             Tournament.Status.IN_PROGRESS

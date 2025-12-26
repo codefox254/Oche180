@@ -30,6 +30,24 @@ class TrainingSessionViewSet(viewsets.ModelViewSet):
         """Only return sessions for the current user"""
         return TrainingSession.objects.filter(user=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        """Create a training session with challenge lock enforcement"""
+        # If user has an active challenge, block creating any other session
+        active_challenge = TrainingSession.objects.filter(
+            user=request.user,
+            mode=TrainingSession.Mode.CHALLENGE,
+            status=TrainingSession.Status.IN_PROGRESS,
+            terminated=False,
+        ).exists()
+
+        if active_challenge:
+            return Response(
+                {"error": "An active challenge is in progress. Complete or terminate it before starting another session."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         """Auto-assign current user when creating session"""
         serializer.save(user=self.request.user)
@@ -67,6 +85,20 @@ class TrainingSessionViewSet(viewsets.ModelViewSet):
         except UserProfile.DoesNotExist:
             pass
         
+        return Response(self.get_serializer(session).data)
+
+    @action(detail=True, methods=["post"], url_path="terminate")
+    def terminate(self, request, pk=None):
+        """Terminate an active challenge session"""
+        session = self.get_object()
+        if session.status != TrainingSession.Status.IN_PROGRESS:
+            return Response({"error": "Session is not in progress"}, status=status.HTTP_400_BAD_REQUEST)
+
+        session.status = TrainingSession.Status.COMPLETED
+        session.terminated = True
+        session.completed_at = timezone.now()
+        session.save()
+
         return Response(self.get_serializer(session).data)
 
     def _calculate_xp(self, session):

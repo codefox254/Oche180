@@ -20,6 +20,7 @@ class Tournament(models.Model):
         REGISTRATION_OPEN = "REG_OPEN", "Registration Open"
         REGISTRATION_CLOSED = "REG_CLOSED", "Registration Closed"
         IN_PROGRESS = "IN_PROGRESS", "In Progress"
+        PAUSED = "PAUSED", "Paused"
         COMPLETED = "COMPLETED", "Completed"
         CANCELLED = "CANCELLED", "Cancelled"
     
@@ -75,6 +76,7 @@ class Tournament(models.Model):
     # Meta
     is_featured = models.BooleanField(default=False)
     banner_image = models.ImageField(upload_to="tournament_banners/", null=True, blank=True)
+    live_scoring_enabled = models.BooleanField(default=True)
     
     # Score Submission
     score_passcode = models.CharField(max_length=20, blank=True, help_text="Passcode for participants to submit scores")
@@ -498,4 +500,30 @@ class MatchScoreSubmission(models.Model):
     
     def __str__(self):
         return f"Score submission for {self.match} by {self.submitted_by.username}"
+
+
+class MatchEvent(models.Model):
+    """Live event feed for a match (for live scores / play-by-play)"""
+
+    class Type(models.TextChoices):
+        SCORE_UPDATE = "SCORE_UPDATE", "Score Update"
+        LEG_START = "LEG_START", "Leg Start"
+        LEG_END = "LEG_END", "Leg End"
+        THROW = "THROW", "Throw"
+        CHECKOUT = "CHECKOUT", "Checkout"
+        PAUSE = "PAUSE", "Pause"
+        RESUME = "RESUME", "Resume"
+        RESULT_OVERRIDE = "RESULT_OVERRIDE", "Result Override"
+        ANNOUNCEMENT = "ANNOUNCEMENT", "Announcement"
+
+    match = models.ForeignKey(TournamentMatch, on_delete=models.CASCADE, related_name="events")
+    event_type = models.CharField(max_length=30, choices=Type.choices)
+    payload = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{self.match} - {self.get_event_type_display()}"
 

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_design.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../data/training_api.dart';
+import 'challenge_session_screen.dart';
 
 class TrainingScreen extends ConsumerStatefulWidget {
   const TrainingScreen({super.key});
@@ -110,6 +111,18 @@ class _TrainingScreenState extends ConsumerState<TrainingScreen> with SingleTick
         },
       );
       _showSnack('Challenge started (Session ${res['id']})');
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (ctx) => ChallengeSessionScreen(
+              sessionId: res['id'] as int,
+              title: challenge['title'] as String,
+              durationMinutes: res['duration_minutes'] as int? ?? 30,
+              api: _api!,
+            ),
+          ),
+        );
+      }
     } catch (e) {
       _showSnack('Could not start challenge: $e', isError: true);
     }
