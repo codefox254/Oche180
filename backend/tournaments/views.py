@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
 from .models import Tournament, TournamentEntry, TournamentMatch, TournamentInvitation, PlayerTournamentRating, TournamentStanding, MatchScoreSubmission
@@ -41,6 +42,29 @@ class TournamentViewSet(viewsets.ModelViewSet):
         elif self.action == "create":
             return TournamentCreateSerializer
         return TournamentDetailSerializer
+    
+    def get_queryset(self):
+        """Filter private tournaments unless user is organizer or participant"""
+        queryset = super().get_queryset()
+        
+        # For list/upcoming/featured, filter out private tournaments unless user has access
+        if self.action in ['list', 'upcoming', 'featured']:
+            if self.request.user.is_authenticated:
+                # Show public tournaments + user's own tournaments (organized or participating)
+                user_tournament_ids = TournamentEntry.objects.filter(
+                    player=self.request.user
+                ).values_list('tournament_id', flat=True)
+                
+                queryset = queryset.filter(
+                    Q(is_private=False) |
+                    Q(organizer=self.request.user) |
+                    Q(id__in=user_tournament_ids)
+                )
+            else:
+                # Anonymous users see only public tournaments
+                queryset = queryset.filter(is_private=False)
+        
+        return queryset
     
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update", "destroy"]:
@@ -244,6 +268,8 @@ class TournamentViewSet(viewsets.ModelViewSet):
             success = BracketGenerator.generate_double_elimination(tournament)
         elif tournament.tournament_format == Tournament.Format.ROUND_ROBIN:
             success = BracketGenerator.generate_round_robin(tournament)
+        elif tournament.tournament_format == Tournament.Format.SWISS:
+            success = BracketGenerator.generate_swiss_system(tournament)
         else:
             return Response(
                 {"error": f"Bracket generation not yet implemented for {tournament.get_tournament_format_display()}"},
@@ -281,10 +307,30 @@ class TournamentViewSet(viewsets.ModelViewSet):
     def upcoming(self, request):
         """Get upcoming tournaments"""
         now = timezone.now()
-        tournaments = Tournament.objects.filter(
+        tournaments = self.get_queryset().filter(
             start_time__gt=now,
             status__in=[Tournament.Status.REGISTRATION_OPEN, Tournament.Status.REGISTRATION_CLOSED]
         ).order_by("start_time")[:20]
+        
+        serializer = TournamentListSerializer(tournaments, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=["get"])
+    def in_progress(self, request):
+        """Get tournaments currently in progress"""
+        tournaments = self.get_queryset().filter(
+            status=Tournament.Status.IN_PROGRESS
+        ).order_by("-start_time")[:20]
+        
+        serializer = TournamentListSerializer(tournaments, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=["get"])
+    def completed(self, request):
+        """Get completed tournaments"""
+        tournaments = self.get_queryset().filter(
+            status=Tournament.Status.COMPLETED
+        ).order_by("-start_time")[:50]
         
         serializer = TournamentListSerializer(tournaments, many=True)
         return Response(serializer.data)

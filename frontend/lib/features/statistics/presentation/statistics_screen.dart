@@ -1,23 +1,26 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_design.dart';
-import '../data/statistics_api.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/services/statistics_service.dart';
 
-class StatisticsScreen extends StatefulWidget {
+class StatisticsScreen extends ConsumerStatefulWidget {
   const StatisticsScreen({super.key});
 
   @override
-  State<StatisticsScreen> createState() => _StatisticsScreenState();
+  ConsumerState<StatisticsScreen> createState() => _StatisticsScreenState();
 }
 
-class _StatisticsScreenState extends State<StatisticsScreen> {
-  final StatisticsApi _api = StatisticsApi(baseUrl: 'http://127.0.0.1:8000/api');
+class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
+  final StatisticsService _service = StatisticsService();
   
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _stats;
-  List<Map<String, dynamic>> _personalBests = [];
+  List<dynamic> _recentGames = [];
+  List<dynamic> _personalBests = [];
 
   @override
   void initState() {
@@ -32,12 +35,21 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     });
     
     try {
-      final stats = await _api.fetchStatsSummary();
-      final pbs = await _api.fetchPersonalBests();
+      final authState = ref.read(authProvider);
+      if (!authState.isAuthenticated || authState.token == null) {
+        setState(() {
+          _error = 'Please login to view statistics';
+          _loading = false;
+        });
+        return;
+      }
+
+      final stats = await _service.getUserStatistics(authState.token!);
+      final games = await _service.getRecentGames(authState.token!, limit: 10);
       
       setState(() {
         _stats = stats;
-        _personalBests = pbs;
+        _recentGames = games;
         _loading = false;
       });
     } catch (e) {
@@ -50,6 +62,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final profile = authState.user?.profile;
+    
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(

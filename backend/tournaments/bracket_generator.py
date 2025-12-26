@@ -1,7 +1,9 @@
 """Automatic bracket generation for various tournament formats"""
 import math
+import random
 from django.utils import timezone
-from .models import TournamentRound, TournamentMatch, TournamentEntry
+from django.db.models import Q
+from .models import TournamentRound, TournamentMatch, TournamentEntry, TournamentStanding
 
 
 class BracketGenerator:
@@ -185,6 +187,205 @@ class BracketGenerator:
                 result.append("Final")
         
         return result
+    
+    @staticmethod
+    def generate_swiss_system(tournament, num_rounds=None):
+        """Generate Swiss system tournament (players with similar scores face each other)"""
+        entries = list(tournament.entries.filter(status=TournamentEntry.Status.CONFIRMED).order_by("seed_number", "registered_at"))
+        num_players = len(entries)
+        
+        if num_players < 2:
+            return False
+        
+        # Calculate recommended number of rounds if not specified
+        if num_rounds is None:
+            num_rounds = math.ceil(math.log2(num_players))
+        
+        # Initialize standings for all players
+        for entry in entries:
+            TournamentStanding.objects.get_or_create(
+                tournament=tournament,
+                entry=entry,
+                defaults={'rank': 0}
+            )
+        
+        # Generate first round with random or seeded pairing
+        first_round = TournamentRound.objects.create(
+            tournament=tournament,
+            round_number=1,
+            name="Round 1"
+        )
+        
+        # Shuffle for first round (or use seeds)
+        random.shuffle(entries)
+        
+        # Pair players for first round
+        for i in range(0, len(entries) - 1, 2):
+            TournamentMatch.objects.create(
+                tournament=tournament,
+                round=first_round,
+                match_number=(i // 2) + 1,
+                player1_entry=entries[i],
+                player2_entry=entries[i + 1]
+            )
+        
+        # Handle bye if odd number
+        if len(entries) % 2 == 1:
+            bye_match = TournamentMatch.objects.create(
+                tournament=tournament,
+                round=first_round,
+                match_number=(len(entries) // 2) + 1,
+                player1_entry=entries[-1],
+                status=TournamentMatch.Status.WALKOVER,
+                winner_entry=entries[-1],
+                player1_score=1
+            )
+        
+        # Create placeholder rounds (pairings generated after each round completes)
+        for round_num in range(2, num_rounds + 1):
+            TournamentRound.objects.create(
+                tournament=tournament,
+                round_number=round_num,
+                name=f"Round {round_num}"
+            )
+        
+        return True
+    
+    @staticmethod
+    def generate_swiss_round_pairings(tournament, round_number):
+        """Generate pairings for a Swiss round based on current standings"""
+        # Get standings sorted by points
+        standings = list(TournamentStanding.objects.filter(
+            tournament=tournament
+        ).select_related('entry').order_by(
+            '-tournament_points',
+            '-buchholz_score',
+            '-points_difference'
+        ))
+        
+        if not standings:
+            return False
+        
+        round_obj = TournamentRound.objects.get(
+            tournament=tournament,
+            round_number=round_number
+        )
+        
+        # Get players who haven't faced each other
+        entries = [s.entry for s in standings]
+        paired = set()
+        match_number = 1
+        
+        # Try to pair players with similar scores
+        for i, entry in enumerate(entries):
+            if entry in paired:
+                continue
+            
+            # Find best opponent (similar score, haven't played before)
+            opponent = None
+            for j in range(i + 1, len(entries)):
+                candidate = entries[j]
+                if candidate in paired:
+                    continue
+                
+                # Check if they've played before
+                previous_match = TournamentMatch.objects.filter(
+                    tournament=tournament,
+                    status=TournamentMatch.Status.COMPLETED
+                ).filter(
+                    (Q(player1_entry=entry) & Q(player2_entry=candidate)) |
+                    (Q(player1_entry=candidate) & Q(player2_entry=entry))
+                ).exists()
+                
+                if not previous_match:
+                    opponent = candidate
+                    break
+            
+            if opponent:
+                TournamentMatch.objects.create(
+                    tournament=tournament,
+                    round=round_obj,
+                    match_number=match_number,
+                    player1_entry=entry,
+                    player2_entry=opponent
+                )
+                paired.add(entry)
+                paired.add(opponent)
+                match_number += 1
+            else:
+                # Give bye if no opponent available
+                TournamentMatch.objects.create(
+                    tournament=tournament,
+                    round=round_obj,
+                    match_number=match_number,
+                    player1_entry=entry,
+                    status=TournamentMatch.Status.WALKOVER,
+                    winner_entry=entry,
+                    player1_score=1
+                )
+                paired.add(entry)
+                match_number += 1
+        
+        return True
+    
+    @staticmethod
+    def update_swiss_standings(tournament):
+        """Update standings after matches complete (including tiebreak scores)"""
+        standings = TournamentStanding.objects.filter(tournament=tournament)
+        
+        for standing in standings:
+            # Update basic stats from matches
+            matches = TournamentMatch.objects.filter(
+                tournament=tournament,
+                status=TournamentMatch.Status.COMPLETED
+            ).filter(
+                Q(player1_entry=standing.entry) | Q(player2_entry=standing.entry)
+            )
+            
+            standing.matches_played = matches.count()
+            standing.matches_won = matches.filter(winner_entry=standing.entry).count()
+            standing.matches_lost = matches.exclude(
+                Q(winner_entry=standing.entry) | Q(winner_entry=None)
+            ).count()
+            standing.matches_drawn = matches.filter(winner_entry=None).count()
+            
+            # Calculate tournament points (3 for win, 1 for draw)
+            standing.tournament_points = (standing.matches_won * 3) + standing.matches_drawn
+            
+            # Calculate scores
+            for match in matches:
+                if match.player1_entry == standing.entry:
+                    standing.points_for += match.player1_score
+                    standing.points_against += match.player2_score
+                    if match.player1_score > standing.highest_score:
+                        standing.highest_score = match.player1_score
+                else:
+                    standing.points_for += match.player2_score
+                    standing.points_against += match.player1_score
+                    if match.player2_score > standing.highest_score:
+                        standing.highest_score = match.player2_score
+            
+            standing.update_statistics()
+            standing.calculate_buchholz()
+            standing.calculate_sonneborn_berger()
+            standing.save()
+        
+        # Update ranks
+        ranked_standings = TournamentStanding.objects.filter(
+            tournament=tournament
+        ).order_by(
+            '-tournament_points',
+            '-points_difference',
+            '-buchholz_score',
+            '-sonneborn_berger',
+            '-points_for'
+        )
+        
+        for rank, standing in enumerate(ranked_standings, start=1):
+            standing.rank = rank
+            standing.save()
+        
+        return True
     
     @staticmethod
     def advance_winner(match, winner_entry):

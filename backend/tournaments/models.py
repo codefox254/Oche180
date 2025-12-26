@@ -43,6 +43,7 @@ class Tournament(models.Model):
     # Entry Management
     max_participants = models.IntegerField(default=32, validators=[MinValueValidator(2), MaxValueValidator(512)])
     min_participants = models.IntegerField(default=4, validators=[MinValueValidator(2)])
+    is_private = models.BooleanField(default=False, help_text="Private tournaments are hidden from public listing")
     allow_public_registration = models.BooleanField(default=True)
     require_approval = models.BooleanField(default=False)  # Organizer must approve entries
     registration_password = models.CharField(max_length=100, blank=True)  # Optional password protection
@@ -367,12 +368,26 @@ class TournamentStanding(models.Model):
     average_score = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     highest_score = models.IntegerField(default=0)
     
+    # Tiebreak Metrics (Buchholz, Sonneborn-Berger)
+    buchholz_score = models.DecimalField(max_digits=6, decimal_places=2, default=0, help_text="Sum of opponents' scores (for Swiss)")
+    sonneborn_berger = models.DecimalField(max_digits=6, decimal_places=2, default=0, help_text="Weighted opponent score")
+    
+    # Head-to-head tiebreak
+    head_to_head_wins = models.IntegerField(default=0, help_text="Wins against tied opponents")
+    
     # Meta
     last_updated = models.DateTimeField(auto_now=True)
     
     class Meta:
         unique_together = ["tournament", "entry"]
-        ordering = ["rank", "-tournament_points", "-points_difference"]
+        ordering = [
+            "rank", 
+            "-tournament_points", 
+            "-points_difference",
+            "-buchholz_score",
+            "-sonneborn_berger",
+            "-points_for"
+        ]
     
     def __str__(self):
         return f"{self.tournament.name} - #{self.rank} {self.entry.player.username}"
@@ -382,6 +397,65 @@ class TournamentStanding(models.Model):
         self.points_difference = self.points_for - self.points_against
         if self.matches_played > 0:
             self.average_score = self.points_for / self.matches_played
+    
+    def calculate_buchholz(self):
+        """Calculate Buchholz score (sum of opponents' tournament points)"""
+        from django.db.models import Sum
+        
+        # Get all matches for this entry
+        matches = TournamentMatch.objects.filter(
+            tournament=self.tournament,
+            status=TournamentMatch.Status.COMPLETED
+        ).filter(
+            models.Q(player1_entry=self.entry) | models.Q(player2_entry=self.entry)
+        )
+        
+        total = 0
+        for match in matches:
+            # Get opponent
+            opponent = match.player2_entry if match.player1_entry == self.entry else match.player1_entry
+            if opponent:
+                opponent_standing = TournamentStanding.objects.filter(
+                    tournament=self.tournament,
+                    entry=opponent
+                ).first()
+                if opponent_standing:
+                    total += opponent_standing.tournament_points
+        
+        self.buchholz_score = total
+        return total
+    
+    def calculate_sonneborn_berger(self):
+        """Calculate Sonneborn-Berger score (weighted by win/draw/loss)"""
+        matches = TournamentMatch.objects.filter(
+            tournament=self.tournament,
+            status=TournamentMatch.Status.COMPLETED
+        ).filter(
+            models.Q(player1_entry=self.entry) | models.Q(player2_entry=self.entry)
+        )
+        
+        total = 0.0
+        for match in matches:
+            opponent = match.player2_entry if match.player1_entry == self.entry else match.player1_entry
+            if opponent:
+                opponent_standing = TournamentStanding.objects.filter(
+                    tournament=self.tournament,
+                    entry=opponent
+                ).first()
+                
+                if opponent_standing:
+                    # Weight by result: 1.0 for win, 0.5 for draw, 0.0 for loss
+                    if match.winner_entry == self.entry:
+                        weight = 1.0
+                    elif match.winner_entry is None:  # Draw
+                        weight = 0.5
+                    else:
+                        weight = 0.0
+                    
+                    total += weight * opponent_standing.tournament_points
+        
+        self.sonneborn_berger = total
+        return total
     
     @property
     def win_rate(self):

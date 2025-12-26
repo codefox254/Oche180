@@ -94,3 +94,44 @@ class CreateGameSerializer(serializers.Serializer):
             )
 
         return game
+
+
+class GameResultDetailedStatsSerializer(serializers.Serializer):
+    """Serializer for detailed game statistics"""
+    total_throws = serializers.IntegerField(required=False, default=0)
+    average_per_dart = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default=0)
+    average_per_round = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
+    checkout_attempts = serializers.IntegerField(required=False, default=0)
+    checkout_successes = serializers.IntegerField(required=False, default=0)
+    checkout_percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default=0)
+    count_180s = serializers.IntegerField(required=False, default=0)
+    count_140_plus = serializers.IntegerField(required=False, default=0)
+    count_100_plus = serializers.IntegerField(required=False, default=0)
+    highest_score = serializers.IntegerField(required=False, default=0)
+    marks_per_round = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True)
+
+
+class GamePlayerResultSerializer(serializers.Serializer):
+    """Serializer for individual player result in game"""
+    name = serializers.CharField(max_length=100)
+    final_score = serializers.IntegerField()
+    final_position = serializers.IntegerField(required=False)
+    is_winner = serializers.BooleanField(required=False, default=False)
+    is_current_user = serializers.BooleanField(required=False, default=False)
+    statistics = serializers.JSONField(required=False, default=dict)
+    detailed_stats = GameResultDetailedStatsSerializer(required=False)
+
+
+class SubmitGameResultSerializer(serializers.Serializer):
+    """Serializer for submitting complete game results"""
+    game_type = serializers.ChoiceField(choices=Game.GameType.choices)
+    is_training = serializers.BooleanField(required=False, default=False)
+    game_settings = serializers.JSONField(required=False, default=dict)
+    players = GamePlayerResultSerializer(many=True, min_length=1, max_length=4)
+    
+    def validate_players(self, players):
+        """Ensure at least one player is marked as current user and winner"""
+        has_current_user = any(p.get('is_current_user') for p in players)
+        if not has_current_user:
+            raise serializers.ValidationError("At least one player must be marked as current user")
+        return players

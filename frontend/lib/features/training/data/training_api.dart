@@ -10,7 +10,7 @@ class TrainingApi {
   Map<String, String> get _headers {
     final headers = {'Content-Type': 'application/json'};
     if (authToken != null) {
-      headers['Authorization'] = 'Bearer $authToken';
+      headers['Authorization'] = 'Token $authToken';
     }
     return headers;
   }

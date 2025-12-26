@@ -84,6 +84,13 @@ class AppTextStyles {
     color: AppColors.textPrimary,
   );
   
+  static const titleMedium = TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.15,
+    color: AppColors.textPrimary,
+  );
+  
   static const bodyLarge = TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.normal,
@@ -93,6 +100,13 @@ class AppTextStyles {
   
   static const bodyMedium = TextStyle(
     fontSize: 14,
+    fontWeight: FontWeight.normal,
+    letterSpacing: 0.25,
+    color: AppColors.textSecondary,
+  );
+  
+  static const bodySmall = TextStyle(
+    fontSize: 12,
     fontWeight: FontWeight.normal,
     letterSpacing: 0.25,
     color: AppColors.textSecondary,

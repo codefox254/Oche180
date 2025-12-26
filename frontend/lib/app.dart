@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/router.dart';
 import 'config/theme.dart';
+import 'core/providers/theme_provider.dart';
 
 class OcheApp extends ConsumerWidget {
   const OcheApp({super.key});
@@ -10,11 +11,13 @@ class OcheApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: 'Oche180',
       theme: lightTheme,
       darkTheme: darkTheme,
+      themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

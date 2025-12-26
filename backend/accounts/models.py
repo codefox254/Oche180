@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.validators import RegexValidator, MinLengthValidator
 from django.db import models
 
 
@@ -40,6 +41,23 @@ class User(AbstractUser):
 
     username = None
     email = models.EmailField(unique=True)
+    # Public handle: 6+ chars, letters/numbers/underscore only
+    public_username = models.CharField(
+        max_length=30,
+        unique=True,
+        validators=[
+            MinLengthValidator(6),
+            RegexValidator(
+                regex=r"^[A-Za-z0-9_]+$",
+                message="Username must be letters, numbers or underscore",
+            ),
+        ],
+        help_text=(
+            "Unique username (6+ chars). Letters, numbers, underscore only."
+        ),
+        null=True,
+        blank=True,
+    )
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
     skill_level = models.CharField(
         max_length=20, choices=SkillLevel.choices, default=SkillLevel.BEGINNER
@@ -53,7 +71,7 @@ class User(AbstractUser):
     objects = UserManager()
 
     def __str__(self) -> str:  # pragma: no cover - trivial representation
-        return self.email or "User"
+        return self.public_username or self.email or "User"
 
 
 class UserProfile(models.Model):

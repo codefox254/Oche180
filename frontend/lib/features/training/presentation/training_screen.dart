@@ -1,19 +1,21 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_design.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../data/training_api.dart';
 
-class TrainingScreen extends StatefulWidget {
+class TrainingScreen extends ConsumerStatefulWidget {
   const TrainingScreen({super.key});
 
   @override
-  State<TrainingScreen> createState() => _TrainingScreenState();
+  ConsumerState<TrainingScreen> createState() => _TrainingScreenState();
 }
 
-class _TrainingScreenState extends State<TrainingScreen> with SingleTickerProviderStateMixin {
+class _TrainingScreenState extends ConsumerState<TrainingScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final TrainingApi _api = TrainingApi(baseUrl: 'http://127.0.0.1:8000/api');
+  TrainingApi? _api;
 
   bool _loading = true;
   String? _error;
@@ -25,7 +27,22 @@ class _TrainingScreenState extends State<TrainingScreen> with SingleTickerProvid
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _loadContent();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Initialize API with auth token
+    final authState = ref.watch(authProvider);
+    if (authState.token != null) {
+      _api = TrainingApi(
+        baseUrl: 'http://127.0.0.1:8000/api',
+        authToken: authState.token,
+      );
+      if (_loading) {
+        _loadContent();
+      }
+    }
   }
 
   @override
@@ -35,8 +52,13 @@ class _TrainingScreenState extends State<TrainingScreen> with SingleTickerProvid
   }
 
   Future<void> _startProgram(Map<String, dynamic> program) async {
+    if (_api == null) {
+      _showSnack('Please login to start training', isError: true);
+      return;
+    }
+    
     try {
-      final res = await _api.startSession(
+      final res = await _api!.startSession(
         mode: 'PROGRAM',
         settings: {
           'program_id': program['id'],
@@ -51,8 +73,13 @@ class _TrainingScreenState extends State<TrainingScreen> with SingleTickerProvid
   }
 
   Future<void> _startDrill(Map<String, dynamic> drill) async {
+    if (_api == null) {
+      _showSnack('Please login to start training', isError: true);
+      return;
+    }
+    
     try {
-      final res = await _api.startSession(
+      final res = await _api!.startSession(
         mode: 'DRILL',
         settings: {
           'drill_id': drill['id'],
@@ -67,8 +94,13 @@ class _TrainingScreenState extends State<TrainingScreen> with SingleTickerProvid
   }
 
   Future<void> _startChallenge(Map<String, dynamic> challenge) async {
+    if (_api == null) {
+      _showSnack('Please login to start training', isError: true);
+      return;
+    }
+    
     try {
-      final res = await _api.startSession(
+      final res = await _api!.startSession(
         mode: 'CHALLENGE',
         settings: {
           'challenge_id': challenge['id'],
@@ -93,14 +125,16 @@ class _TrainingScreenState extends State<TrainingScreen> with SingleTickerProvid
   }
 
   Future<void> _loadContent() async {
+    if (_api == null) return;
+    
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final programs = await _api.fetchPrograms();
-      final drills = await _api.fetchDrills();
-      final challenges = await _api.fetchChallenges();
+      final programs = await _api!.fetchPrograms();
+      final drills = await _api!.fetchDrills();
+      final challenges = await _api!.fetchChallenges();
       setState(() {
         _programs = programs.isNotEmpty ? programs : _defaultPrograms;
         _drills = drills.isNotEmpty ? drills : _defaultDrills;

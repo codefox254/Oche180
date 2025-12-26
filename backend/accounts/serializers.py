@@ -36,6 +36,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "email",
+            "public_username",
             "first_name",
             "last_name",
             "skill_level",
@@ -44,3 +45,7 @@ class UserSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+        extra_kwargs = {
+            'email': {'required': False},
+            'public_username': {'required': False},
+        }

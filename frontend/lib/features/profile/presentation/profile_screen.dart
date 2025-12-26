@@ -1,13 +1,18 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_design.dart';
+import '../../../core/providers/auth_provider.dart';
+import 'edit_profile_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -71,9 +76,19 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-class _ProfileHeader extends StatelessWidget {
+class _ProfileHeader extends ConsumerWidget {
+  const _ProfileHeader();
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final profile = user?.profile;
+    
+    final displayName = user?.displayName ?? 'Guest Player';
+    final skillLevel = user?.skillLevel ?? 'BEGINNER';
+    final totalGames = profile?.totalGamesPlayed ?? 0;
+    final level = profile?.level ?? 1;
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppBorderRadius.xl),
       child: BackdropFilter(
@@ -113,7 +128,7 @@ class _ProfileHeader extends StatelessWidget {
               
               // Name and Level
               Text(
-                'Guest Player',
+                displayName,
                 style: AppTextStyles.headlineMedium,
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -128,9 +143,9 @@ class _ProfileHeader extends StatelessWidget {
                   ),
                   borderRadius: BorderRadius.circular(AppBorderRadius.full),
                 ),
-                child: const Text(
-                  'Intermediate',
-                  style: TextStyle(
+                child: Text(
+                  _formatSkillLevel(skillLevel),
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
@@ -142,19 +157,19 @@ class _ProfileHeader extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _QuickStat(label: 'Games', value: '0'),
+                  _QuickStat(label: 'Level', value: '$level'),
                   Container(
                     width: 1,
                     height: 30,
                     color: AppColors.bgLight,
                   ),
-                  _QuickStat(label: 'Wins', value: '0'),
+                  _QuickStat(label: 'Games', value: '$totalGames'),
                   Container(
                     width: 1,
                     height: 30,
                     color: AppColors.bgLight,
                   ),
-                  _QuickStat(label: 'Win Rate', value: '0%'),
+                  _QuickStat(label: 'XP', value: '${profile?.totalXp ?? 0}'),
                 ],
               ),
             ],
@@ -162,6 +177,21 @@ class _ProfileHeader extends StatelessWidget {
         ),
       ),
     );
+  }
+  
+  String _formatSkillLevel(String level) {
+    switch (level) {
+      case 'BEGINNER':
+        return 'Beginner';
+      case 'INTERMEDIATE':
+        return 'Intermediate';
+      case 'ADVANCED':
+        return 'Advanced';
+      case 'PROFESSIONAL':
+        return 'Professional';
+      default:
+        return level;
+    }
   }
 }
 
@@ -389,15 +419,26 @@ class _RecentMatches extends StatelessWidget {
   }
 }
 
-class _SettingsSection extends StatelessWidget {
+class _SettingsSection extends ConsumerWidget {
+  const _SettingsSection();
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    
     return Column(
       children: [
         _SettingItem(
           icon: Icons.edit,
           title: 'Edit Profile',
-          onTap: () {},
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const EditProfileScreen(),
+              ),
+            );
+          },
         ),
         _SettingItem(
           icon: Icons.palette,
@@ -409,12 +450,31 @@ class _SettingsSection extends StatelessWidget {
           title: 'Notifications',
           onTap: () {},
         ),
-        _SettingItem(
-          icon: Icons.logout,
-          title: 'Sign Out',
-          textColor: AppColors.error,
-          onTap: () {},
-        ),
+        if (authState.isAuthenticated)
+          _SettingItem(
+            icon: Icons.logout,
+            title: 'Sign Out',
+            textColor: AppColors.error,
+            onTap: () async {
+              await ref.read(authProvider.notifier).logout();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Signed out successfully'),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+                context.go('/auth');
+              }
+            },
+          )
+        else
+          _SettingItem(
+            icon: Icons.login,
+            title: 'Sign In',
+            textColor: AppColors.primary,
+            onTap: () => context.push('/auth/login'),
+          ),
       ],
     );
   }

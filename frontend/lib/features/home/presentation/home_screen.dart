@@ -1,15 +1,22 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_design.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/theme_provider.dart';
+import '../../../core/utils/auth_utils.dart';
+import '../../../core/widgets/dartboard_icon.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
     return Scaffold(
       drawer: const _AppDrawer(),
         bottomNavigationBar: _FooterNavigation(),
@@ -44,7 +51,7 @@ class HomeScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Oche180',
+                      user != null ? 'Hi, ${user.displayName}' : 'Oche180',
                       style: AppTextStyles.headlineMedium.copyWith(
                         foreground: Paint()
                           ..shader = const LinearGradient(
@@ -53,7 +60,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Professional Darts',
+                      user != null ? 'Ready to play?' : 'Professional Darts',
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: AppColors.textTertiary,
                       ),
@@ -61,6 +68,21 @@ class HomeScreen extends StatelessWidget {
                   ],
                 ),
                 actions: [
+                  IconButton(
+                    icon: Consumer(
+                      builder: (context, ref, _) {
+                        final themeMode = ref.watch(themeModeProvider);
+                        return Icon(
+                          themeMode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode,
+                          color: AppColors.primary,
+                        );
+                      },
+                    ),
+                    onPressed: () {
+                      ref.read(themeModeProvider.notifier).toggleTheme();
+                    },
+                    tooltip: 'Toggle Theme',
+                  ),
                   IconButton(
                     icon: const Icon(Icons.person_outline, color: AppColors.primary),
                     onPressed: () => context.push('/profile'),
@@ -87,11 +109,17 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _StatsOverview extends StatelessWidget {
+class _StatsOverview extends ConsumerWidget {
   const _StatsOverview();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final profile = user?.profile;
+    
+    final totalGames = profile?.totalGamesPlayed ?? 0;
+    final totalXP = profile?.totalXp ?? 0;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -133,9 +161,9 @@ class _StatsOverview extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _StatItem(label: 'Games', value: '0', icon: Icons.sports_esports),
-              _StatItem(label: 'Avg', value: '0.0', icon: Icons.show_chart),
-              _StatItem(label: '180s', value: '0', icon: Icons.stars),
+              _StatItem(label: 'Games', value: '$totalGames', icon: Icons.sports_esports),
+              _StatItem(label: 'XP', value: '$totalXP', icon: Icons.stars),
+              _StatItem(label: 'Level', value: '${profile?.level ?? 1}', icon: Icons.trending_up),
             ],
           ),
         ],
@@ -179,11 +207,13 @@ class _StatItem extends StatelessWidget {
   }
 }
 
-class _QuickActions extends StatelessWidget {
+class _QuickActions extends ConsumerWidget {
   const _QuickActions();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -196,6 +226,7 @@ class _QuickActions extends StatelessWidget {
                 icon: Icons.play_circle_fill,
                 label: 'Quick Match',
                 gradient: AppColors.primaryGradient,
+                requiresAuth: false,
                 onTap: () => context.push('/game-modes'),
               ),
             ),
@@ -205,7 +236,14 @@ class _QuickActions extends StatelessWidget {
                 icon: Icons.fitness_center,
                 label: 'Training',
                 gradient: AppColors.accentGradient,
-                onTap: () => context.push('/training'),
+                requiresAuth: true,
+                onTap: () {
+                  if (authState.isAuthenticated) {
+                    context.push('/training');
+                  } else {
+                    showLoginRequiredDialog(context);
+                  }
+                },
               ),
             ),
           ],
@@ -218,7 +256,14 @@ class _QuickActions extends StatelessWidget {
                 icon: Icons.emoji_events,
                 label: 'Tournaments',
                 gradient: AppColors.secondaryGradient,
-                onTap: () => context.push('/tournaments'),
+                requiresAuth: true,
+                onTap: () {
+                  if (authState.isAuthenticated) {
+                    context.push('/tournaments');
+                  } else {
+                    showLoginRequiredDialog(context);
+                  }
+                },
               ),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -227,7 +272,14 @@ class _QuickActions extends StatelessWidget {
                 icon: Icons.bar_chart,
                 label: 'Statistics',
                 gradient: [const Color(0xFF6366F1), const Color(0xFF8B5CF6)],
-                onTap: () => context.push('/statistics'),
+                requiresAuth: true,
+                onTap: () {
+                  if (authState.isAuthenticated) {
+                    context.push('/statistics');
+                  } else {
+                    showLoginRequiredDialog(context);
+                  }
+                },
               ),
             ),
           ],
@@ -242,40 +294,72 @@ class _ActionCard extends StatelessWidget {
   final String label;
   final List<Color> gradient;
   final VoidCallback onTap;
+  final bool requiresAuth;
 
   const _ActionCard({
     required this.icon,
     required this.label,
     required this.gradient,
     required this.onTap,
+    this.requiresAuth = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: gradient),
-          borderRadius: BorderRadius.circular(AppBorderRadius.lg),
-          boxShadow: [
-            BoxShadow(
-              color: gradient[0].withOpacity(0.3),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppBorderRadius.lg),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradient,
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 40, color: AppColors.bgDark),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              label,
-              style: AppTextStyles.labelLarge.copyWith(color: AppColors.bgDark),
-            ),
-          ],
+            borderRadius: BorderRadius.circular(AppBorderRadius.lg),
+            boxShadow: [
+              BoxShadow(
+                color: gradient.first.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: Colors.white, size: 40),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    label,
+                    style: AppTextStyles.bodyLarge.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              if (requiresAuth)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(AppBorderRadius.sm),
+                    ),
+                    child: const Icon(Icons.lock_outline, color: Colors.white70, size: 16),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -394,11 +478,15 @@ class _GameModeCard extends StatelessWidget {
   }
 }
 
-class _AppDrawer extends StatelessWidget {
+class _AppDrawer extends ConsumerWidget {
   const _AppDrawer();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final isAuthenticated = authState.isAuthenticated;
+
     return Drawer(
       backgroundColor: AppColors.bgDark,
       child: Column(
@@ -419,19 +507,19 @@ class _AppDrawer extends StatelessWidget {
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(AppBorderRadius.full),
                   ),
-                  child: const Icon(Icons.sports_baseball, color: Colors.white, size: 32),
+                  child: const DartboardIcon(size: 32, color: Colors.white),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                const Text(
-                  'Oche180',
-                  style: TextStyle(
+                Text(
+                  isAuthenticated ? user!.displayName : 'Oche180',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  'Professional Darts Scoring',
+                  isAuthenticated ? user!.email : 'Professional Darts Scoring',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.8),
                     fontSize: 12,
@@ -450,6 +538,20 @@ class _AppDrawer extends StatelessWidget {
                   onTap: () => Navigator.pop(context),
                 ),
                 _DrawerItem(
+                  icon: Icons.person_outline,
+                  title: 'Profile',
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (isAuthenticated) {
+                      context.push('/profile');
+                    } else {
+                      showLoginRequiredDialog(context);
+                    }
+                  },
+                  requiresAuth: true,
+                  isAuthenticated: isAuthenticated,
+                ),
+                _DrawerItem(
                   icon: Icons.play_circle_filled,
                   title: 'Quick Play',
                   onTap: () {
@@ -466,12 +568,32 @@ class _AppDrawer extends StatelessWidget {
                   },
                 ),
                 _DrawerItem(
+                  icon: Icons.emoji_events,
+                  title: 'Tournaments',
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (isAuthenticated) {
+                      context.push('/tournaments');
+                    } else {
+                      showLoginRequiredDialog(context);
+                    }
+                  },
+                  requiresAuth: true,
+                  isAuthenticated: isAuthenticated,
+                ),
+                _DrawerItem(
                   icon: Icons.fitness_center,
                   title: 'Training',
                   onTap: () {
                     Navigator.pop(context);
-                    context.push('/training');
+                    if (isAuthenticated) {
+                      context.push('/training');
+                    } else {
+                      showLoginRequiredDialog(context);
+                    }
                   },
+                  requiresAuth: true,
+                  isAuthenticated: isAuthenticated,
                 ),
                 const Divider(color: AppColors.bgLight),
                 _DrawerItem(
@@ -479,13 +601,14 @@ class _AppDrawer extends StatelessWidget {
                   title: 'Statistics',
                   onTap: () {
                     Navigator.pop(context);
-                    context.push('/statistics');
+                    if (isAuthenticated) {
+                      context.push('/statistics');
+                    } else {
+                      showLoginRequiredDialog(context);
+                    }
                   },
-                ),
-                _DrawerItem(
-                  icon: Icons.history,
-                  title: 'Match History',
-                  onTap: () => Navigator.pop(context),
+                  requiresAuth: true,
+                  isAuthenticated: isAuthenticated,
                 ),
                 _DrawerItem(
                   icon: Icons.book,
@@ -496,11 +619,28 @@ class _AppDrawer extends StatelessWidget {
                   },
                 ),
                 const Divider(color: AppColors.bgLight),
-                _DrawerItem(
-                  icon: Icons.settings,
-                  title: 'Settings',
-                  onTap: () => Navigator.pop(context),
-                ),
+                if (!isAuthenticated)
+                  _DrawerItem(
+                    icon: Icons.shield_outlined,
+                    title: 'Login / Signup',
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/auth');
+                    },
+                  ),
+                if (isAuthenticated)
+                  _DrawerItem(
+                    icon: Icons.logout,
+                    title: 'Logout',
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await ref.read(authProvider.notifier).logout();
+                      if (context.mounted) {
+                        context.go('/auth');
+                      }
+                    },
+                    textColor: AppColors.error,
+                  ),
                 _DrawerItem(
                   icon: Icons.info_outline,
                   title: 'About',
@@ -528,21 +668,30 @@ class _DrawerItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final VoidCallback onTap;
+  final Color? textColor;
+  final bool requiresAuth;
+  final bool isAuthenticated;
 
   const _DrawerItem({
     required this.icon,
     required this.title,
     required this.onTap,
+    this.textColor,
+    this.requiresAuth = false,
+    this.isAuthenticated = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon, color: AppColors.primary),
+      leading: Icon(icon, color: textColor ?? AppColors.primary),
       title: Text(
         title,
-        style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textPrimary),
+        style: AppTextStyles.bodyLarge.copyWith(color: textColor ?? AppColors.textPrimary),
       ),
+      trailing: (requiresAuth && !isAuthenticated)
+          ? Icon(Icons.lock_outline, color: AppColors.textTertiary.withOpacity(0.5), size: 18)
+          : null,
       onTap: onTap,
       hoverColor: AppColors.bgLight,
     );
